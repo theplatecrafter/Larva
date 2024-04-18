@@ -41,7 +41,7 @@ def slice_stl_to_dwg(stl_filename, slicing_planes, output_prefix, output_dir='ou
         print(f"Saved {len(intersecting_polygons)} polygons to {output_path}")
 
 # Example usage
-stl_filename = 'data/Cube_3d_printing_sample.stl'
+stl_filename = 'data/Stanford_Bunny_sample.stl'
 slicing_planes = [('x', 0), ('y', 0), ('z', 0)]  # Example slicing planes (X=0, Y=0, Z=0)
 output_prefix = 'output_slice'
 output_dir = 'output'  # Output directory for DWG files
