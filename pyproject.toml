@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "school_project"
+version = "0.1.0"
+description = ""
+authors = ["Toren C <theplatecrafter@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy-stl = "^3.1.1"
+pytest = "^8.1.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
