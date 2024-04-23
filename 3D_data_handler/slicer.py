@@ -1,6 +1,6 @@
 import numpy as np
 import ezdxf
-from stl import mesh as stl_mesh  # Import the stl mesh module
+from stl import mesh as stl_mesh
 import os
 
 def slice_stl_to_dwg(stl_filename, slicing_planes, output_prefix, output_dir='output'):
@@ -24,7 +24,7 @@ def slice_stl_to_dwg(stl_filename, slicing_planes, output_prefix, output_dir='ou
                 intersecting_polygons.append(triangle)
 
         # Create a new DXF document
-        dxf = ezdxf.new("R2007")
+        dxf = ezdxf.new("R2010")
         msp = dxf.modelspace()
 
         # Add intersecting polygons to DXF
@@ -41,8 +41,8 @@ def slice_stl_to_dwg(stl_filename, slicing_planes, output_prefix, output_dir='ou
         print(f"Saved {len(intersecting_polygons)} polygons to {output_path}")
 
 # Example usage
-stl_filename = 'data/Stanford_Bunny_sample.stl'
-slicing_planes = [('x', 0), ('y', 0), ('z', 0)]  # Example slicing planes (X=0, Y=0, Z=0)
+stl_filename = 'data/Another_Hollow_Cube.stl'
+slicing_planes = [('x', 0), ('x', 1), ('x', 2)]
 output_prefix = 'output_slice'
 output_dir = 'output'  # Output directory for DWG files
 slice_stl_to_dwg(stl_filename, slicing_planes, output_prefix, output_dir)

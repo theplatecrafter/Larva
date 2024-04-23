@@ -5,7 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 # Load the STL file
-test = m.Mesh.from_file('data/Menger_sponge_sample.stl')
+test = m.Mesh.from_file('data/Another_Hollow_Cube.stl')
 
 # Get the minimum and maximum coordinates for each axis
 min_x, max_x = np.min(test.vectors[:,:,0]), np.max(test.vectors[:,:,0])
