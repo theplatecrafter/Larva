@@ -18,6 +18,4 @@
 .venv
 /poetry.toml
 
-data
-
 output
