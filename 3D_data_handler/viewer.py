@@ -61,3 +61,4 @@ ax.set_zlim(zlim)
 
 # Show the plot
 plt.show()
+plt.savefig("output/mesh_view.png")
