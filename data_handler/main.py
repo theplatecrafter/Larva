@@ -75,11 +75,12 @@ def extract_bodies_from_stl(stl_path:str,output_dir:str,output_base_name:str = "
 
   return bodies
 
-def slice_stl_to_dwg(stl_path:str, slicing_planes:list, output_dir:str, output_base_name:str = "sliced_stl"):
+def slice_stl_to_dwg(stl_path:str, slicing_planes:list, output_dir:str, output_base_name:str = "sliced_stl_"):
   os.makedirs(output_dir, exist_ok=True)
 
   stl_model = m.Mesh.from_file(stl_path)
 
+  n = 0
   for plane_index, (axis, position) in enumerate(slicing_planes):
     axis_index = {'x': 0, 'y': 1, 'z': 2}[axis]
     direction = np.sign(position)
@@ -92,12 +93,14 @@ def slice_stl_to_dwg(stl_path:str, slicing_planes:list, output_dir:str, output_b
     dxf = ezdxf.new("R2010")
     msp = dxf.modelspace()
 
+    
     for polygon in intersecting_polygons:
+      
       points = polygon[:, [0, 1]]
       points = np.vstack([points, points[0]])
       msp.add_lwpolyline(points)
-
-    output_filename = f"{output_base_name}.dwg"
+    n += 1
+    output_filename = f"{output_base_name}{n}.dwg"
     output_path = os.path.join(output_dir, output_filename)
     dxf.saveas(output_path)
     print(f"Saved {len(intersecting_polygons)} polygons to {output_path}")
