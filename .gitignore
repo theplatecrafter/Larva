@@ -18,4 +18,6 @@
 .venv
 /poetry.toml
 
-output
+output/CAD/bodies
+output/CAD/dwg
+output/image
