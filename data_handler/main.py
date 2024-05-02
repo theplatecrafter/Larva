@@ -6,12 +6,15 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import os
 from skimage.measure import label
 import ezdxf
-from step_converter import convert_stl_to_step
+import subprocess
+from shapely.geometry import Polygon, MultiPolygon
 
 # set output folders
 body_output_dir = "output/CAD/bodies"
 dwg_output_dir = "output/CAD/dwg"
 image_output_dir = "output/image"
+obj_output_dir = "output/CAD/obj"
+stl_output_dir = "output/CAD/stl"
 
 # local functions
 
@@ -23,13 +26,40 @@ def remove_files_in_directory(directory_path):
         if os.path.isfile(file_path):
             os.remove(file_path)
 
+
 def clear_output_paths():
     remove_files_in_directory(body_output_dir)
     remove_files_in_directory(dwg_output_dir)
     remove_files_in_directory(image_output_dir)
+    remove_files_in_directory(obj_output_dir)
+    remove_files_in_directory(stl_output_dir)
 
 
 # global functions
+def convert_stl_to_step(stl_path, step_path):
+    """
+    Convert an STL file to a STEP file.
+
+    Args:
+        stl_path (str): Path to the input STL file.
+        step_path (str): Path to save the output STEP file.
+
+    Returns:
+        bool: True if conversion is successful, False otherwise.
+    """
+    if not os.path.isfile(stl_path):
+        print(f"Error: File '{stl_path}' not found.")
+        return False
+
+    try:
+        subprocess.run(["meshconv", "-c", "step", stl_path,
+                       "-o", step_path], check=True)
+        print(f"Conversion successful. STEP file saved at '{step_path}'.")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Conversion failed. {e}")
+        return False
+
 def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png"):
     dwg = ezdxf.readfile(dwg_path)
     msp = dwg.modelspace()
@@ -55,7 +85,6 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png"):
 
     plt.show()
     plt.savefig(f"{output_dir}/{output_name}")
-
 
 def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: str = "Body_"):
     stl_mesh = m.Mesh.from_file(stl_path)
@@ -87,7 +116,6 @@ def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: st
 
     return bodies
 
-
 def slice_stl_to_dwg(stl_path: str, slicing_planes: list, output_dir: str, output_base_name: str = "sliced_stl_"):
     os.makedirs(output_dir, exist_ok=True)
 
@@ -116,7 +144,6 @@ def slice_stl_to_dwg(stl_path: str, slicing_planes: list, output_dir: str, outpu
         output_path = os.path.join(output_dir, output_filename)
         dxf.saveas(output_path)
         print(f"Saved {len(intersecting_polygons)} polygons to {output_path}")
-
 
 def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     target_stl = m.Mesh.from_file(stl_path)
@@ -170,53 +197,55 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     plt.show()
     plt.savefig(f"{output_dir}/{output_name}")
 
+def obj_to_stl(obj_path:str, output_dir:str, output_name:str = "obj_converted.stl"):
+    # Load vertices and faces from the OBJ file
+    vertices = []
+    faces = []
+    with open(obj_path, 'r') as f:
+        for line in f:
+            if line.startswith('v '):
+                vertex = [float(v) for v in line.strip().split()[1:]]
+                vertices.append(vertex)
+            elif line.startswith('f '):
+                face = [int(i.split('/')[0]) - 1 for i in line.strip().split()[1:]]
+                faces.append(face)
 
-def find_outer_edges(vertices):
-    edges = set()
-    for i in range(len(vertices)):
-        edge = (tuple(vertices[i]), tuple(vertices[(i + 1) % len(vertices)]))
-        reverse_edge = edge[::-1]
-        if reverse_edge in edges:
-            edges.remove(reverse_edge)
-        else:
-            edges.add(edge)
-    return list(edges)
+    # Create an STL mesh
+    vertices = np.array(vertices)
+    faces = np.array(faces)
+    mesh_data = m.Mesh(np.zeros(faces.shape[0], dtype=m.Mesh.dtype))
+    for i, f in enumerate(faces):
+        for j in range(3):
+            mesh_data.vectors[i][j] = vertices[f[j], :]
 
-def slice_stl_to_dwg_without_lines(stl_path: str, slicing_planes: list, output_dir: str, output_base_name: str = "sliced_stl_"):
-    os.makedirs(output_dir, exist_ok=True)
+    # Save the mesh to an STL file
+    mesh_data.save(f"{output_dir}/{output_name}")
+    
+def view_obj(obj_path: str, output_dir: str, output_base_name: str = "obj_view.png"):
+    vertices = []
 
-    stl_model = m.Mesh.from_file(stl_path)
+    with open(obj_path, 'r') as f:
+        for line in f:
+            if line.startswith('v '):
+                vertex = [float(v) for v in line.strip().split()[1:]]
+                vertices.append(vertex)
 
-    # Convert to STEP format
-    step_filename = os.path.join(output_dir, "converted_model.step")
-    convert_stl_to_step(stl_path, step_filename)
+    if len(vertices) == 0:
+        print("No vertices found in the .obj file.")
+        return
 
-    n = 0
-    for plane_index, (axis, position) in enumerate(slicing_planes):
-        axis_index = {'x': 0, 'y': 1, 'z': 2}[axis]
-        direction = np.sign(position)
+    vertices = np.array(vertices)
 
-        intersecting_polygons = []
-        for triangle in stl_model.vectors:
-            if (triangle[:, axis_index].min() * direction <= position * direction <= triangle[:, axis_index].max() * direction):
-                intersecting_polygons.append(triangle)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
 
-        dxf = ezdxf.new("R2010")
-        msp = dxf.modelspace()
+    # Plot vertices
+    ax.scatter(vertices[:, 0], vertices[:, 1], vertices[:, 2], color='b')
 
-        for polygon in intersecting_polygons:
-            edges = find_outer_edges(polygon)
-            for edge in edges:
-                msp.add_line(edge[0], edge[1])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
 
-        n += 1
-        output_filename = f"{output_base_name}{n}.dwg"
-        output_path = os.path.join(output_dir, output_filename)
-        dxf.saveas(output_path)
-        print(f"Saved {len(intersecting_polygons)} polygons to {output_path}")
-
-
-
-
-
+    plt.savefig(f"{output_dir}/{output_base_name}")
+    plt.show()
 
