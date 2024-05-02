@@ -36,6 +36,9 @@ def clear_output_paths():
 
 
 # global functions
+def plt_image_saver(plt,output_dir:str,output_name:str = "image_folder"):
+    os.makedirs(f"{output_dir}/{output_name}")
+
 def convert_stl_to_step(stl_path, step_path):
     """
     Convert an STL file to a STEP file.
@@ -85,6 +88,8 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png"):
 
     plt.show()
     plt.savefig(f"{output_dir}/{output_name}")
+
+    return plt
 
 def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: str = "Body_"):
     stl_mesh = m.Mesh.from_file(stl_path)
@@ -197,10 +202,13 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     plt.show()
     plt.savefig(f"{output_dir}/{output_name}")
 
-def obj_to_stl(obj_path:str, output_dir:str, output_name:str = "obj_converted.stl"):
-    # Load vertices and faces from the OBJ file
+    return plt
+
+def obj_to_stl(obj_path: str, output_dir: str, output_name: str = "obj_converted.stl"):
     vertices = []
     faces = []
+
+    # Load vertices and faces from the OBJ file
     with open(obj_path, 'r') as f:
         for line in f:
             if line.startswith('v '):
@@ -208,19 +216,30 @@ def obj_to_stl(obj_path:str, output_dir:str, output_name:str = "obj_converted.st
                 vertices.append(vertex)
             elif line.startswith('f '):
                 face = [int(i.split('/')[0]) - 1 for i in line.strip().split()[1:]]
-                faces.append(face)
+                if len(face) != 3:  # Check if face has exactly 3 vertices
+                    print(f"Skipping face with invalid number of vertices: {face}")
+                else:
+                    faces.append(face)
 
-    # Create an STL mesh
+    # Check if any faces were loaded
+    if not faces:
+        print("No valid faces found in the OBJ file.")
+        return
+
+    # Convert vertices and faces to numpy arrays
     vertices = np.array(vertices)
     faces = np.array(faces)
-    mesh_data = m.Mesh(np.zeros(faces.shape[0], dtype=m.Mesh.dtype))
+
+    # Create an STL mesh
+    mesh_data = m.Mesh(np.zeros(len(faces), dtype=m.Mesh.dtype))
     for i, f in enumerate(faces):
         for j in range(3):
             mesh_data.vectors[i][j] = vertices[f[j], :]
 
     # Save the mesh to an STL file
-    mesh_data.save(f"{output_dir}/{output_name}")
-    
+    output_file = os.path.join(output_dir, output_name)
+    mesh_data.save(output_file)
+
 def view_obj(obj_path: str, output_dir: str, output_base_name: str = "obj_view.png"):
     vertices = []
 
@@ -249,3 +268,64 @@ def view_obj(obj_path: str, output_dir: str, output_base_name: str = "obj_view.p
     plt.savefig(f"{output_dir}/{output_base_name}")
     plt.show()
 
+    return plt
+
+def slice_obj_file(input_file, slice_thickness, output_dir):
+    # Load the OBJ file
+    vertices = []
+    edges = []
+    with open(input_file, 'r') as f:
+        for line in f:
+            if line.startswith('v '):
+                vertex = [float(v) for v in line.strip().split()[1:]]
+                vertices.append(vertex)
+            elif line.startswith('l '):
+                edge = [int(v) for v in line.strip().split()[1:]]
+                edges.append(edge)
+
+    vertices = np.array(vertices)
+    edges = np.array(edges) - 1  # Obj files use 1-based indexing
+
+    # Determine the bounding box of the object
+    min_bound = np.min(vertices, axis=0)
+    max_bound = np.max(vertices, axis=0)
+    bounding_box = max_bound - min_bound
+    num_slices = int(bounding_box[2] / slice_thickness)
+
+    # Create slices
+    for i in range(num_slices):
+        z_min = min_bound[2] + i * slice_thickness
+        z_max = z_min + slice_thickness
+
+        # Find edges intersecting the slice
+        intersecting_edges = []
+        for edge in edges:
+            v1, v2 = vertices[edge[0]], vertices[edge[1]]
+            if v1[2] <= z_max and v2[2] >= z_min or v2[2] <= z_max and v1[2] >= z_min:
+                intersecting_edges.append([v1, v2])
+
+        # Create polygons for the slice
+        polygons = []
+        for edge in intersecting_edges:
+            x1, y1, z1 = edge[0]
+            x2, y2, z2 = edge[1]
+            # Project the edge onto the XY plane
+            if z1 < z_min:
+                x1 = x2 - (x2 - x1) * (z2 - z_min) / (z2 - z1)
+                y1 = y2 - (y2 - y1) * (z2 - z_min) / (z2 - z1)
+                z1 = z_min
+            if z2 > z_max:
+                x2 = x1 + (x2 - x1) * (z_max - z1) / (z2 - z1)
+                y2 = y1 + (y2 - y1) * (z_max - z1) / (z2 - z1)
+                z2 = z_max
+            polygons.append(Polygon([(x1, y1), (x2, y2)]))
+
+        # Create a DXF file for this slice
+        dxf = ezdxf.new()
+        msp = dxf.modelspace()
+
+        for polygon in polygons:
+            msp.add_lwpolyline(list(polygon.exterior.coords), close=True)
+
+        output_file = os.path.join(output_dir, f"slice_{i}.dwg")
+        dxf.saveas(output_file)

@@ -65,7 +65,7 @@ def slice_obj_file(input_file, slice_thickness, output_dir):
         dxf.saveas(output_file)
 
 if __name__ == "__main__":
-    input_file = "data/teddy_bear.obj"  # Change to your input OBJ file path
+    input_file = "data/obj/teddy_bear.obj"  # Change to your input OBJ file path
     slice_thickness = 5  # Adjust as needed
     output_dir = "output/CAD/dwg"  # Specify the output directory here
     slice_obj_file(input_file, slice_thickness, output_dir)
