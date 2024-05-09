@@ -1,13 +1,4 @@
-import numpy as np
-from stl import mesh as m
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import os
-from skimage.measure import label
-import ezdxf
-import subprocess
-from shapely.geometry import Polygon, MultiPolygon
+from tools import *
 
 # set output folders
 body_output_dir = "output/CAD/bodies"
@@ -17,15 +8,12 @@ obj_output_dir = "output/CAD/obj"
 stl_output_dir = "output/CAD/stl"
 
 # local functions
-
-
 def remove_files_in_directory(directory_path):
     files = os.listdir(directory_path)
     for file_name in files:
         file_path = os.path.join(directory_path, file_name)
         if os.path.isfile(file_path):
             os.remove(file_path)
-
 
 def clear_output_paths():
     remove_files_in_directory(body_output_dir)
@@ -34,8 +22,20 @@ def clear_output_paths():
     remove_files_in_directory(obj_output_dir)
     remove_files_in_directory(stl_output_dir)
 
-
 # global functions
+def dwg_get_points(dwg_file:str):
+    dwgFile = ezdxf.readfile(dwg_file)
+    msp = dwgFile.modelspace()
+
+    points = []
+    for entity in msp:
+        for i in entity.get_points():
+            points.append(i)
+    
+    points = rmSame(points)
+    print(points)
+    return points
+
 def plt_image_saver(plt,output_dir:str,output_name:str = "image_folder"):
     os.makedirs(f"{output_dir}/{output_name}")
 
@@ -329,3 +329,4 @@ def slice_obj_file(input_file, slice_thickness, output_dir):
 
         output_file = os.path.join(output_dir, f"slice_{i}.dwg")
         dxf.saveas(output_file)
+        print(f"created sliced obj file to {output_file}")
