@@ -9,6 +9,9 @@ import ezdxf
 import subprocess
 from shapely.geometry import Polygon, MultiPolygon
 from itertools import combinations
+import shutil
+from moviepy.editor import ImageSequenceClip
+import math
 
 def rmSame(x: list) -> list:
     """removes any duplicated values"""
@@ -34,3 +37,13 @@ def create_dwg_outof_lines(lines,out):
         msp.add_line(line[0],line[1])
     
     newDWG.saveas(out)
+
+def png_to_mp4(image_folder:list, output_folder:str,filename:str = "movie.mp4", fps=30):
+    import os
+    image_files = sorted([os.path.join(image_folder, img)
+                          for img in os.listdir(image_folder)
+                          if img.endswith(".png")])
+
+    clip = ImageSequenceClip(image_files, fps=fps)
+    
+    clip.write_videofile(os.path.join(output_folder,filename), codec="libx264")

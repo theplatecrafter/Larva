@@ -23,7 +23,7 @@ def detect_overlapping_lines(dwg_file_path, output_file_path):
         with lwpolyline.points() as points:
             vertices = list(points)
             line_segments = [(vertices[i], vertices[i+1]) for i in range(len(vertices) - 1)]
-
+            
         # Append line segments to the list
         all_lines.extend(line_segments)
     
@@ -46,7 +46,7 @@ def detect_overlapping_lines(dwg_file_path, output_file_path):
                 all_lines.remove((lines_to_remove[i][1],lines_to_remove[i][0]))
 
     return all_lines
-    
+
 
 
 # Usage example
