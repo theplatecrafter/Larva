@@ -47,3 +47,23 @@ def png_to_mp4(image_folder:list, output_folder:str,filename:str = "movie.mp4", 
     clip = ImageSequenceClip(image_files, fps=fps)
     
     clip.write_videofile(os.path.join(output_folder,filename), codec="libx264")
+
+def is_valid_triangle(points:list):
+    """
+    Determine if a 2D triangle is valid based on its area.
+
+    Args:
+    points (list): A list of three tuples representing the triangle's vertices (x, y).
+
+    Returns:
+    bool: True if the triangle is valid (area > 0), False otherwise.
+    """
+    if len(points) != 3:
+        raise ValueError("Input must be a list of three tuples representing the vertices of a triangle.")
+    
+    (x1, y1), (x2, y2), (x3, y3) = points[0],points[1],points[2]
+
+    # Calculate the area using the determinant method
+    area = 0.5 * abs(x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2))
+
+    return area > 0

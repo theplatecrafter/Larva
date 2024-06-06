@@ -17,13 +17,42 @@ try:
 except Exception:
     pass
 
-# local functions
+# global functions
+def removeUnneededlines(path_to_dwg:str,output_path:str,output_name:str="fixed_dwg"):
+    doc = ezdxf.readfile(path_to_dwg)
+    msp = doc.modelspace()
+    t = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
+
+    tri = []
+    for i in range(len(t)):
+        p = t[i].get_points()
+        if len(p) == 4:
+            p.pop()
+        for j in range(len(p)):
+            p[j] = p[j][:2]
+        tri.append(p)
+    
+    invTri = []
+    for i in rmSame(tri):
+        if not is_valid_triangle(i):
+            invTri.append(i)
+
+    newDoc = ezdxf.new()
+    newMSP = newDoc.modelspace()
+    for i in invTri:
+        newMSP.add_lwpolyline(i)
+    
+    print(f"created new modulespace with {len(invTri)} lines")
+    newDoc.saveas(os.path.join(output_path,f"{output_name}.dwg"))
+
 def get_dwg_info(path_to_dwg:str,output_path:str):
     output_path = os.path.join(output_path,"dwg_file_infos")
     os.mkdir(output_path)
     out = view_dwg(path_to_dwg,output_path,"dwg.png",None,True)
     bounding = out[1]["bounding_box"]
     return_dwg_parts(path_to_dwg,output_path)
+
+    t = []
 
     files = os.listdir(os.path.join(output_path,"dwgparts"))
     os.makedirs(os.path.join(output_path,"dwgpartsimage"))
@@ -32,6 +61,11 @@ def get_dwg_info(path_to_dwg:str,output_path:str):
         file_path = os.path.join(os.path.join(output_path,"dwgparts"), files[i])
         if os.path.isfile(file_path):
             view_dwg(file_path,os.path.join(output_path,"dwgpartsimage"),f"#{i+1}triangle",bounding)
+            tmpdoc = ezdxf.readfile(file_path)
+            tmpmsp = [entity for entity in tmpdoc.modelspace() if entity.dxftype() == "LWPOLYLINE"]
+            print(f"loaded #{i+1} triangle modulespace data: consists of {len(tmpmsp)} LWPOLYLINE")
+            for i in tmpmsp:
+                t.append(i)
 
     png_to_mp4(os.path.join(output_path,"dwgpartsimage"),output_path,"dwgpartsmovie.mp4",int(math.log(len(files)+1,1.3)))
 
@@ -39,7 +73,7 @@ def get_dwg_info(path_to_dwg:str,output_path:str):
     txtinfo.write(f"dwg file path: {path_to_dwg}\n")
     doc = ezdxf.readfile(path_to_dwg)
     msp = doc.modelspace()
-    t = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
+
     s = [entity for entity in msp if entity.dxftype() == "LINE"]
     txtinfo.write(f"{len(t)} triangles, {len(s)} lines\n\ntriangles:\n")
     for i in range(len(t)):
@@ -98,6 +132,8 @@ def get_dwg_info(path_to_dwg:str,output_path:str):
     for i in range(len(allpoints)):
         txtinfo.write(f"point {i+1}: {allpoints[i]}\n")
     txtinfo.close()
+    print("created info file")
+    print("done!")
 
 def force_remove_all(directory_path):
     if not os.path.exists(directory_path):
