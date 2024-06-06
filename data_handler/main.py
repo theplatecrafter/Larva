@@ -7,6 +7,7 @@ dwg_output_dir = "output/CAD/dwg"
 image_output_dir = "output/image"
 obj_output_dir = "output/CAD/obj"
 stl_output_dir = "output/CAD/stl"
+info_output_dir = "output/infos"
 
 try:
     os.mkdir(body_output_dir)
@@ -14,8 +15,35 @@ try:
     os.mkdir(image_output_dir)
     os.mkdir(obj_output_dir)
     os.mkdir(stl_output_dir)
+    os.mkdir(info_output_dir)
 except Exception:
     pass
+
+## local functions
+def force_remove_all(directory_path):
+    if not os.path.exists(directory_path):
+        print(f"The directory {directory_path} does not exist.")
+        return
+    for item in os.listdir(directory_path):
+        item_path = os.path.join(directory_path, item)
+        try:
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+        except Exception as e:
+            print(f"Failed to remove {item_path}: {e}")
+
+    print(f"All files and directories in {directory_path} have been removed.")
+
+def clear_output_paths():
+    force_remove_all(body_output_dir)
+    force_remove_all(dwg_output_dir)
+    force_remove_all(image_output_dir)
+    force_remove_all(obj_output_dir)
+    force_remove_all(stl_output_dir)
+    force_remove_all(info_output_dir)
+
 
 # global functions
 def removeUnneededlines(path_to_dwg:str,output_path:str,output_name:str="fixed_dwg"):
@@ -45,8 +73,8 @@ def removeUnneededlines(path_to_dwg:str,output_path:str,output_name:str="fixed_d
     print(f"created new modulespace with {len(invTri)} lines")
     newDoc.saveas(os.path.join(output_path,f"{output_name}.dwg"))
 
-def get_dwg_info(path_to_dwg:str,output_path:str):
-    output_path = os.path.join(output_path,"dwg_file_infos")
+def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_file_infos"):
+    output_path = os.path.join(output_path,outputfoldername)
     os.mkdir(output_path)
     out = view_dwg(path_to_dwg,output_path,"dwg.png",None,True)
     bounding = out[1]["bounding_box"]
@@ -76,13 +104,20 @@ def get_dwg_info(path_to_dwg:str,output_path:str):
 
     s = [entity for entity in msp if entity.dxftype() == "LINE"]
     txtinfo.write(f"{len(t)} triangles, {len(s)} lines\n\ntriangles:\n")
+    invcount = 0
     for i in range(len(t)):
         p = t[i].get_points()
         if len(p) == 4:
             p.pop()
         for j in range(len(p)):
             p[j] = p[j][:2]
-        txtinfo.write(f"triangle {i+1}: {p}\n")
+        if is_valid_triangle(p):
+            txtinfo.write(f"valid: triangle {i+1}: {p}\n")
+        else:
+            txtinfo.write(f"invalid: triangle {i+1}: {p}\n")
+            invcount += 1
+    txtinfo.write(f"{invcount} invalid triangles, {len(t)-invcount} valid triangles")
+
     
     txtinfo.write("\n\nlines:\n")
 
@@ -131,37 +166,12 @@ def get_dwg_info(path_to_dwg:str,output_path:str):
     txtinfo.write(f"\n\nall points ({len(allpoints)} points exists):\n")
     for i in range(len(allpoints)):
         txtinfo.write(f"point {i+1}: {allpoints[i]}\n")
+
+
+    
     txtinfo.close()
     print("created info file")
     print("done!")
-
-def force_remove_all(directory_path):
-    if not os.path.exists(directory_path):
-        print(f"The directory {directory_path} does not exist.")
-        return
-    for item in os.listdir(directory_path):
-        item_path = os.path.join(directory_path, item)
-        try:
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            else:
-                os.remove(item_path)
-        except Exception as e:
-            print(f"Failed to remove {item_path}: {e}")
-
-    print(f"All files and directories in {directory_path} have been removed.")
-
-def clear_output_paths():
-    force_remove_all(body_output_dir)
-    force_remove_all(dwg_output_dir)
-    force_remove_all(image_output_dir)
-    force_remove_all(obj_output_dir)
-    force_remove_all(stl_output_dir)
-    try:
-        force_remove_all("output/dwg_file_infos")
-        os.rmdir("output/dwg_file_infos")
-    except Exception:
-        pass
 
 def return_dwg_parts(path_to_dwg: str, outputdir: str, foldername: str = "dwgparts"):
     try:
