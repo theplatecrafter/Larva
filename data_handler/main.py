@@ -8,6 +8,7 @@ image_output_dir = "output/image"
 obj_output_dir = "output/CAD/obj"
 stl_output_dir = "output/CAD/stl"
 info_output_dir = "output/infos"
+video_output_dir = "output/video"
 
 try:
     os.mkdir(body_output_dir)
@@ -43,10 +44,11 @@ def clear_output_paths():
     force_remove_all(obj_output_dir)
     force_remove_all(stl_output_dir)
     force_remove_all(info_output_dir)
+    force_remove_all(video_output_dir)
 
 
 # global functions
-def removeUnneededlines(path_to_dwg:str,output_path:str,output_name:str="fixed_dwg"):
+def removeUnneededlines(path_to_dwg:str,output_path:str,triangleErrorRange:float = 0,output_name:str="fixed_dwg"):
     doc = ezdxf.readfile(path_to_dwg)
     msp = doc.modelspace()
     t = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
@@ -62,7 +64,7 @@ def removeUnneededlines(path_to_dwg:str,output_path:str,output_name:str="fixed_d
     
     invTri = []
     for i in rmSame(tri):
-        if not is_valid_triangle(i):
+        if not is_valid_triangle(i,triangleErrorRange):
             invTri.append(i)
 
     newDoc = ezdxf.new()
@@ -95,81 +97,30 @@ def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_fil
             for i in tmpmsp:
                 t.append(i)
 
-    png_to_mp4(os.path.join(output_path,"dwgpartsimage"),output_path,"dwgpartsmovie.mp4",int(math.log(len(files)+1,1.3)))
+    png_to_mp4(os.path.join(output_path,"dwgpartsimage"),output_path,"dwgpartsmovie")
 
-    txtinfo = open(os.path.join(output_path,"info.txt"),"w")
-    txtinfo.write(f"dwg file path: {path_to_dwg}\n")
     doc = ezdxf.readfile(path_to_dwg)
     msp = doc.modelspace()
 
+    triDATA = [[],[],[],[],[]] ## number, valid/invalid, points, true points, area
     s = [entity for entity in msp if entity.dxftype() == "LINE"]
-    txtinfo.write(f"{len(t)} triangles, {len(s)} lines\n\ntriangles:\n")
-    invcount = 0
     for i in range(len(t)):
         p = t[i].get_points()
+        triDATA[0].append(i+1)
+        triDATA[3].append(str(p))
         if len(p) == 4:
             p.pop()
         for j in range(len(p)):
             p[j] = p[j][:2]
+        triDATA[2].append(str(p))
+        triDATA[4].append(calculateAreaOfTriangle(p))
         if is_valid_triangle(p):
-            txtinfo.write(f"valid: triangle {i+1}: {p}\n")
+            triDATA[1].append("valid")
         else:
-            txtinfo.write(f"invalid: triangle {i+1}: {p}\n")
-            invcount += 1
-    txtinfo.write(f"{invcount} invalid triangles, {len(t)-invcount} valid triangles")
+            triDATA[1].append("invalid")
+    createSimpleXLSX(["#","validity","points","true points","area"],triDATA,output_path,"info")
+            
 
-    
-    txtinfo.write("\n\nlines:\n")
-
-    for i in range(len(s)):
-        p = s[i].get_points()
-        for j in range(len(p)):
-            p[j] = p[j][:2]
-        txtinfo.write(f"line {i+1}: {p}\n")
-
-    lines = []
-    for entity in t:
-        points = entity.get_points()
-        for i in range(len(points)):
-            for j in range(len(points)):
-                lines.append([(points[i][0],points[i][1]),(points[j][0],points[j][1])])
-    
-    newLines = []
-    for i in range(len(lines)):
-        if lines[i][0] != lines[i][1]:
-            newLines.append(lines[i])
-    lines = rmSame(newLines)
-
-    newLines = []
-    for i in range(len(lines)):
-        checkFor = [lines[i][1],lines[i][0]]
-        if checkFor not in newLines:
-            newLines.append(lines[i])
-    lines = newLines
-    
-    txtinfo.write("\n\nlines that can be made with this file:\n")
-    for i in range(len(lines)):
-        txtinfo.write(f"line{i+1}: {lines[i]}\n")
-
-    allpoints = []
-    x,y = [],[]
-    for entity in msp:
-        p = entity.get_points()
-        for i in p:
-            allpoints.append(i[:2])
-            x.append(allpoints[-1][0])
-            y.append(allpoints[-1][1])
-        
-    allpoints = rmSame(allpoints)
-    txtinfo.write(f"\n\ncenter:({(max(x)+min(x))/2},{(max(y)+min(y))/2})\n")
-    txtinfo.write(f"dimension: {max(x)-min(x)} x {max(y)-min(y)}\n")
-    txtinfo.write(f"\n\nall points ({len(allpoints)} points exists):\n")
-    for i in range(len(allpoints)):
-        txtinfo.write(f"point {i+1}: {allpoints[i]}\n")
-
-
-    
-    txtinfo.close()
     print("created info file")
     print("done!")
 
