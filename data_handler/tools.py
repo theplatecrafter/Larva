@@ -13,6 +13,8 @@ import shutil
 from moviepy.editor import ImageSequenceClip
 import math
 import xlsxwriter as xlsw
+from matplotlib.colors import hsv_to_rgb
+
 
 def rmSame(x: list) -> list:
     """removes any duplicated values"""
@@ -86,49 +88,83 @@ def createSimpleXLSX(collumNames:list,collumContent:list,output_folder:str,outpu
     
     workbook.close()
 
-def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=1e-6):
-    ndotu = planeNormal.dot(rayDirection)
+def printIF(boolean:bool,printString:str):
+    """prints printString if boolean == True"""
+    if boolean:
+        print(printString)
+
+def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=0, printDeets=False):
+    ndotu = np.dot(planeNormal, rayDirection)
+    printIF(printDeets, f"ndotu: {ndotu}")
     if abs(ndotu) < epsilon:
+        printIF(printDeets, "No intersection, the line is parallel to the plane.")
         return None
 
     w = rayPoint - planePoint
-    si = -planeNormal.dot(w) / ndotu
-    Psi = w + si * rayDirection + planePoint
+    si = -np.dot(planeNormal, w) / ndotu
+    Psi = rayPoint + si * rayDirection
+    printIF(printDeets, f"Collision Point: {Psi}")
     return Psi
 
-def LineSegmantPlaneCollision(planeNormal:np.ndarray, planePoint:np.ndarray,a0:np.ndarray,a1:np.ndarray):
-    rayDirection = a1-a0
+def LineSegmentPlaneCollision(planeNormal: np.ndarray, planePoint: np.ndarray, a0: np.ndarray, a1: np.ndarray, printDeets=False):
+    rayDirection = a1 - a0
     rayPoint = a0
     planeNormal = np.array(planeNormal)
     planePoint = np.array(planePoint)
 
-    if planeNormal.dot(planePoint-a0) == 0 and planeNormal.dot(planePoint-a1) == 0:
-        return [a0,a1]
+    printIF(printDeets, f"Checking line segment: {a0} to {a1}")
 
-    point = LinePlaneCollision(planeNormal,planePoint,rayDirection,rayPoint)
-    try:
-        if list(point) != None:
-            n = np.linalg.norm(point-a0)/np.linalg.norm(a1-a0)
-            if 0 < n < 1:
-                return point
-    except:
-        pass
-    return np.array([None,None,None])
+    if np.isclose(np.dot(planeNormal, planePoint - a0), 0) and np.isclose(np.dot(planeNormal, planePoint - a1), 0):
+        printIF(printDeets, "The line segment is on the plane.")
+        return [tuple(a0), tuple(a1)]
 
-def SliceTriangleAtPlane(planeNormal:np.ndarray,planePoint:np.ndarray,triangle:list):
-    a,b,c = triangle[0],triangle[1],triangle[2]
-    check0, check1, check2 = LineSegmantPlaneCollision(planeNormal,planePoint,a,b), LineSegmantPlaneCollision(planeNormal,planePoint,c,b), LineSegmantPlaneCollision(planeNormal,planePoint,a,c)
-    if len(check0) == 2 and len(check1) == 2 and len(check2) == 2:
-        return [tuple(i) for i in triangle]
-    elif len(check0) == 2:
-        return [tuple(i) for i in check0]
-    elif len(check1) == 2:
-        return [tuple(i) for i in check1]
-    elif len(check2) == 2:
-        return [tuple(i) for i in check2]
+    point = LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, printDeets=printDeets)
+    if point is not None:
+        n = np.linalg.norm(point - a0) / np.linalg.norm(a1 - a0)
+        printIF(printDeets, f"Intersection parameter n: {n}")
+        if 0 <= n <= 1:
+            return tuple(point)
+
+    return None
+
+def SliceTriangleAtPlane(planeNormal: np.ndarray, planePoint: np.ndarray, triangle: list, printDeets=False):
+    a, b, c = np.array(triangle[0]), np.array(triangle[1]), np.array(triangle[2])
+    printIF(printDeets, f"Triangle vertices: {a}, {b}, {c}")
+    check0 = LineSegmentPlaneCollision(planeNormal, planePoint, a, b, printDeets=printDeets)
+    check1 = LineSegmentPlaneCollision(planeNormal, planePoint, b, c, printDeets=printDeets)
+    check2 = LineSegmentPlaneCollision(planeNormal, planePoint, c, a, printDeets=printDeets)
+
+    printIF(printDeets, f"Intersections: {check0}, {check1}, {check2}")
+
+    if check0 is None and check1 is None and check2 is None:
+        return None
+
+    points = []
+    if check0 is not None and check1 is not None and check2 is not None:
+        if np.isclose(np.dot(planeNormal, a - planePoint), 0) and np.isclose(np.dot(planeNormal, b - planePoint), 0) and np.isclose(np.dot(planeNormal, c - planePoint), 0):
+            return [tuple(a), tuple(b), tuple(c)]
+        points.extend([check0, check1, check2])
     else:
-        out = [tuple(i) for i in [check0,check1,check2] if (i != None).all()]
-        if len(out) == 0:
-            return None
+        if check0 is not None:
+            points.append(check0)
+        if check1 is not None:
+            points.append(check1)
+        if check2 is not None:
+            points.append(check2)
+
+    # Ensure all elements are tuples before converting to set
+    flattened_points = []
+    for point in points:
+        if isinstance(point, list):
+            flattened_points.extend(point)
         else:
-            return out
+            flattened_points.append(point)
+
+    unique_points = list(set(flattened_points))
+    
+    if len(unique_points) == 2:
+        return unique_points
+    elif len(unique_points) > 2:
+        return unique_points
+
+    return None

@@ -227,25 +227,29 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png",
                     start_y = min(start_y, min(y_vals)) if start_y is not None else min(y_vals)
                     end_y = max(end_y, max(y_vals)) if end_y is not None else max(y_vals)
         
-        start_x -= (end_x-start_x)/15
-        end_x += (end_x-start_x)/15
-        start_y -= (end_y-start_y)/15
-        end_y += (end_y-start_y)/15
-
+        start_x -= (end_x - start_x) / 15
+        end_x += (end_x - start_x) / 15
+        start_y -= (end_y - start_y) / 15
+        end_y += (end_y - start_y) / 15
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    for entity in entities:
+    # Generate a colormap
+    num_entities = len(entities)
+    colors = hsv_to_rgb(np.linspace(0, 1, num_entities).reshape(-1, 1) * np.ones((1, 3)))
+
+    for idx, entity in enumerate(entities):
+        color = colors[idx]
         if entity.dxftype() == 'LINE':
             start_point = (entity.dxf.start[0], entity.dxf.start[1])
             end_point = (entity.dxf.end[0], entity.dxf.end[1])
-            ax.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], 'b-')
+            ax.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color=color)
         elif entity.dxftype() == 'LWPOLYLINE':
             points = entity.get_points()
             x = [point[0] for point in points]  # Extract x-coordinates
             y = [point[1] for point in points]  # Extract y-coordinates
-            ax.plot(x, y, 'r-')
+            ax.plot(x, y, color=color)
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -270,6 +274,7 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png",
         return plt, info
     else:
         return plt
+
 
 def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: str = "Body_"):
     stl_mesh = m.Mesh.from_file(stl_path)
@@ -313,16 +318,23 @@ def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_po
     n=0
     for triangle in stl_model.vectors:
         out = SliceTriangleAtPlane(np.array(slicing_plane_normal),np.array(slicing_plane_point),triangle)
-        n+=1
         if out != None:
-            print(n,out)
-            print(triangle)
+            n+=1
+            zPlane = []
             for i in range(len(out)):
+                zPlane.append(out[i][-1])
                 out[i] = out[i][:-1]
-            msp.add_lwpolyline(out)
+            out = rmSame(out)
+            if len(out) != 1:
+                msp.add_lwpolyline(out)
+                print(f"{n}: Created {len(out)}-point LWPOLYLINE : {out}\ntriangle:{triangle}")
             
     file_out = os.path.join(output_dir,output_base_name+".dwg")
     dwg.saveas(file_out)
+
+def get_stl_details(path_to_stl:str,output_path:str,outputfoldername:str = "stl_file_infos"):
+    output_path = os.path.join(output_path,outputfoldername)
+    os.mkdir(output_path)
 
 def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     target_stl = m.Mesh.from_file(stl_path)
