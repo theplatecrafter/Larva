@@ -1,58 +1,52 @@
-from tools import *
-import main as dh
+import numpy as np
 
-def ccw(A, B, C):
-    """Check if three points are listed in counterclockwise order."""
-    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=1e-6):
+    ndotu = planeNormal.dot(rayDirection)
+    if abs(ndotu) < epsilon:
+        return None
 
-def intersect(line1, line2):
-    """Check if two line segments intersect."""
-    A, B = line1
-    C, D = line2
-    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+    w = rayPoint - planePoint
+    si = -planeNormal.dot(w) / ndotu
+    Psi = w + si * rayDirection + planePoint
+    return Psi
 
-def detect_overlapping_lines(dwg_file_path, output_file_path):
-    # Load the DWG file
-    doc = ezdxf.readfile(dwg_file_path)
-    msp = doc.modelspace()
+def LineSegmantPlaneCollision(planeNormal:list, planePoint:list,line:list):
+    a0 = np.array(line[0])
+    a1 = np.array(line[1])
+    rayDirection = a1-a0
+    rayPoint = a0 #Any point along the ray
+    planeNormal = np.array(planeNormal)
+    planePoint = np.array(planePoint)
 
-    lwpolylines = [entity for entity in msp if entity.dxftype() == 'LWPOLYLINE']
+    if planeNormal.dot(planePoint-a0) == 0 and planeNormal.dot(planePoint-a1) == 0:
+        return line
 
-    all_lines = []
-    for lwpolyline in lwpolylines:
-        with lwpolyline.points() as points:
-            vertices = list(points)
-            line_segments = [(vertices[i], vertices[i+1]) for i in range(len(vertices) - 1)]
-            
-        # Append line segments to the list
-        all_lines.extend(line_segments)
+    point = LinePlaneCollision(planeNormal,planePoint,rayDirection,rayPoint)
+    if point.any() != None:
+        n = abs(point-a0)/abs(a1-a0)
+        print(n)
+        if 0 < n < 1:
+            return tuple(point)
     
-    all_lines = rmSame(all_lines)
+    return None
 
-    # Check for intersection among all line segments
-    lines_to_remove = []
-    for line1, line2 in combinations(all_lines, 2):
-        if intersect(line1, line2):
-            lines_to_remove.append(line1)
-            lines_to_remove.append(line2)
-
-    lines_to_remove = rmSame(lines_to_remove)
-
-    for i in range(len(lines_to_remove)):
-        if lines_to_remove[i] in all_lines or (lines_to_remove[i][1],lines_to_remove[i][0]) in all_lines:
-            if lines_to_remove[i] in all_lines:
-                all_lines.remove(lines_to_remove[i])
-            else:
-                all_lines.remove((lines_to_remove[i][1],lines_to_remove[i][0]))
-
-    return all_lines
-
-
-
-# Usage example
-dwg_file_path = "output/CAD/dwg/sliced_stl_1.dwg"
-output_file_path = "output/CAD/dwg/rminter.dwg"
-l = detect_overlapping_lines(dwg_file_path, output_file_path)
-print(l)
-dh.create_dwg_outof_lines(l,output_file_path)
-dh.view_dwg("output/CAD/dwg/rminter.dwg",dh.image_output_dir)
+def TrianglePlaneCollision(triangle:list,planeNormal:list,planePoint:list):
+    p0, p1, p2 = triangle[0], triangle[1], triangle[2]
+    line0, line1, line2 = [p0,p1], [p0,p2], [p1,p2]
+    out0, out1, out2 = LineSegmantPlaneCollision(planeNormal,planePoint,line0),LineSegmantPlaneCollision(planeNormal,planePoint,line1),LineSegmantPlaneCollision(planeNormal,planePoint,line2)
+    if len(out0) == 2 and len(out1) == 2 and len(out2) == 2:
+        return triangle
+    elif len(out0) == 2:
+        return out0
+    elif len(out1) == 2:
+        return out1
+    elif len(out2) == 2:
+        return out2
+    else:
+        out = [i for i in [out0,out1,out2] if i != None]
+        if len(out) == 0:
+            return None
+        else:
+            return out
+        
+print(TrianglePlaneCollision([(1,1,1),(4,1,4),(2.5,4,2.5)],(2,2,2),(1,1,-2)))

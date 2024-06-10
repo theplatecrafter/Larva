@@ -113,11 +113,17 @@ def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_fil
         for j in range(len(p)):
             p[j] = p[j][:2]
         triDATA[2].append(str(p))
-        triDATA[4].append(calculateAreaOfTriangle(p))
-        if is_valid_triangle(p):
-            triDATA[1].append("valid")
-        else:
-            triDATA[1].append("invalid")
+        try:
+            triDATA[4].append(calculateAreaOfTriangle(p))
+        except:
+            triDATA[4].append(None)
+        try:
+            if is_valid_triangle(p):
+                triDATA[1].append("valid")
+            else:
+                triDATA[1].append("invalid")
+        except:
+            triDATA[1].append("is Line")
     createSimpleXLSX(["#","validity","points","true points","area"],triDATA,output_path,"info")
             
 
@@ -295,44 +301,35 @@ def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: st
 
     return bodies
 
-def slice_stl_to_dwg(stl_path: str, slicing_planes: list, output_dir: str, output_base_name: str = "sliced_stl_"):
+def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_base_name: str = "sliced"):
     os.makedirs(output_dir, exist_ok=True)
 
+    dwg = ezdxf.new()
+    msp = dwg.modelspace()
     stl_model = m.Mesh.from_file(stl_path)
 
-    n = 0
-    for plane_index, (axis, position) in enumerate(slicing_planes):
-        axis_index = {'x': 0, 'y': 1, 'z': 2}[axis]
-        direction = np.sign(position)
-
-        intersecting_polygons = []
-        for triangle in stl_model.vectors:
-            if (triangle[:, axis_index].min() * direction <= position * direction <= triangle[:, axis_index].max() * direction):
-                intersecting_polygons.append(triangle)
-
-        dxf = ezdxf.new("R2010")
-        msp = dxf.modelspace()
-
-        for polygon in intersecting_polygons:
-
-            points = polygon[:, [0, 1]]
-            points = np.vstack([points, points[0]])
-            msp.add_lwpolyline(points)
-        n += 1
-        output_filename = f"{output_base_name}{n}.dwg"
-        output_path = os.path.join(output_dir, output_filename)
-        dxf.saveas(output_path)
-        print(f"Saved {len(intersecting_polygons)} polygons to {output_path}")
+    line = []
+    triangle = []
+    n=0
+    for triangle in stl_model.vectors:
+        out = SliceTriangleAtPlane(np.array(slicing_plane_normal),np.array(slicing_plane_point),triangle)
+        n+=1
+        if out != None:
+            print(n,out)
+            print(triangle)
+            for i in range(len(out)):
+                out[i] = out[i][:-1]
+            msp.add_lwpolyline(out)
+            
+    file_out = os.path.join(output_dir,output_base_name+".dwg")
+    dwg.saveas(file_out)
 
 def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     target_stl = m.Mesh.from_file(stl_path)
 
-    min_x, max_x = np.min(target_stl.vectors[:, :, 0]), np.max(
-        target_stl.vectors[:, :, 0])
-    min_y, max_y = np.min(target_stl.vectors[:, :, 1]), np.max(
-        target_stl.vectors[:, :, 1])
-    min_z, max_z = np.min(target_stl.vectors[:, :, 2]), np.max(
-        target_stl.vectors[:, :, 2])
+    min_x, max_x = np.min(target_stl.vectors[:, :, 0]), np.max(target_stl.vectors[:, :, 0])
+    min_y, max_y = np.min(target_stl.vectors[:, :, 1]), np.max(target_stl.vectors[:, :, 1])
+    min_z, max_z = np.min(target_stl.vectors[:, :, 2]), np.max(target_stl.vectors[:, :, 2])
 
     length_x = max_x - min_x
     length_y = max_y - min_y
@@ -342,12 +339,9 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
 
     margin = largest_length * 0.1
 
-    xlim = [(min_x + max_x - largest_length) / 2 - margin,
-            (min_x + max_x + largest_length) / 2 + margin]
-    ylim = [(min_y + max_y - largest_length) / 2 - margin,
-            (min_y + max_y + largest_length) / 2 + margin]
-    zlim = [(min_z + max_z - largest_length) / 2 - margin,
-            (min_z + max_z + largest_length) / 2 + margin]
+    xlim = [(min_x + max_x - largest_length) / 2 - margin, (min_x + max_x + largest_length) / 2 + margin]
+    ylim = [(min_y + max_y - largest_length) / 2 - margin, (min_y + max_y + largest_length) / 2 + margin]
+    zlim = [(min_z + max_z - largest_length) / 2 - margin, (min_z + max_z + largest_length) / 2 + margin]
 
     x = 1600
     y = 1200
@@ -356,13 +350,20 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     ax = fig.add_subplot(111, projection='3d')
 
     polygons = []
-
     for i in range(len(target_stl.vectors)):
         tri = target_stl.vectors[i]
         polygons.append(tri)
 
-    ax.add_collection3d(Poly3DCollection(
-        polygons, color='cyan', linewidths=1, edgecolors='blue'))
+    # Generate a colormap with unique colors
+    cmap = plt.get_cmap('tab20', len(polygons))
+    colors = [cmap(i) for i in range(len(polygons))]
+
+    poly_collection = Poly3DCollection(polygons, linewidths=1, edgecolors='k')
+
+    # Assign a different color to each triangle
+    poly_collection.set_facecolors(colors)
+
+    ax.add_collection3d(poly_collection)
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')

@@ -85,3 +85,50 @@ def createSimpleXLSX(collumNames:list,collumContent:list,output_folder:str,outpu
             worksheet.write(j+1,i,collumContent[i][j])
     
     workbook.close()
+
+def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=1e-6):
+    ndotu = planeNormal.dot(rayDirection)
+    if abs(ndotu) < epsilon:
+        return None
+
+    w = rayPoint - planePoint
+    si = -planeNormal.dot(w) / ndotu
+    Psi = w + si * rayDirection + planePoint
+    return Psi
+
+def LineSegmantPlaneCollision(planeNormal:np.ndarray, planePoint:np.ndarray,a0:np.ndarray,a1:np.ndarray):
+    rayDirection = a1-a0
+    rayPoint = a0
+    planeNormal = np.array(planeNormal)
+    planePoint = np.array(planePoint)
+
+    if planeNormal.dot(planePoint-a0) == 0 and planeNormal.dot(planePoint-a1) == 0:
+        return [a0,a1]
+
+    point = LinePlaneCollision(planeNormal,planePoint,rayDirection,rayPoint)
+    try:
+        if list(point) != None:
+            n = np.linalg.norm(point-a0)/np.linalg.norm(a1-a0)
+            if 0 < n < 1:
+                return point
+    except:
+        pass
+    return np.array([None,None,None])
+
+def SliceTriangleAtPlane(planeNormal:np.ndarray,planePoint:np.ndarray,triangle:list):
+    a,b,c = triangle[0],triangle[1],triangle[2]
+    check0, check1, check2 = LineSegmantPlaneCollision(planeNormal,planePoint,a,b), LineSegmantPlaneCollision(planeNormal,planePoint,c,b), LineSegmantPlaneCollision(planeNormal,planePoint,a,c)
+    if len(check0) == 2 and len(check1) == 2 and len(check2) == 2:
+        return [tuple(i) for i in triangle]
+    elif len(check0) == 2:
+        return [tuple(i) for i in check0]
+    elif len(check1) == 2:
+        return [tuple(i) for i in check1]
+    elif len(check2) == 2:
+        return [tuple(i) for i in check2]
+    else:
+        out = [tuple(i) for i in [check0,check1,check2] if (i != None).all()]
+        if len(out) == 0:
+            return None
+        else:
+            return out
