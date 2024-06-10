@@ -313,8 +313,6 @@ def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_po
     msp = dwg.modelspace()
     stl_model = m.Mesh.from_file(stl_path)
 
-    line = []
-    triangle = []
     n=0
     for triangle in stl_model.vectors:
         out = SliceTriangleAtPlane(np.array(slicing_plane_normal),np.array(slicing_plane_point),triangle)
@@ -332,9 +330,21 @@ def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_po
     file_out = os.path.join(output_dir,output_base_name+".dwg")
     dwg.saveas(file_out)
 
-def get_stl_details(path_to_stl:str,output_path:str,outputfoldername:str = "stl_file_infos"):
+def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_file_infos"):
     output_path = os.path.join(output_path,outputfoldername)
     os.mkdir(output_path)
+    stl_model = m.Mesh.from_file(path_to_stl)
+
+    triangles = [[i+1 for i in range(len(stl_model.vectors))],[],[],[]]
+    print(triangles)
+    for triangle in stl_model.vectors:
+        triangle = list(triangle)
+        triangles[1].append(str(triangle[0]))
+        triangles[2].append(str(triangle[1]))
+        triangles[3].append(str(triangle[2]))
+    print(triangles)
+    view_stl(path_to_stl,output_path,"stl.png")
+    createSimpleXLSX(["#","p1","p2","p3"],triangles,output_path,"info")
 
 def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png"):
     target_stl = m.Mesh.from_file(stl_path)
