@@ -1,11 +1,6 @@
 from tools import *
+import main as dh
 
-
-tri = [np.array([1,0,-0.00000032]),np.array([0,1,0.00000032]),np.array([0,0,0.00000032])]
-out = SliceTriangleAtPlane(np.array([0,0,1]),np.array([0,0,0]),tri,True)
-print(out)
-
-if out != None:
-    for i in range(len(out)):
-        out[i] = out[i][:-1]
-    print(out)
+dh.clear_output_paths()
+dh.view_stl("data/stl/hollow_cube.stl",dh.image_output_dir)
+print(dh.view_dwg("data/dwg/cube.dwg",dh.image_output_dir,"yep.png",None,True))

@@ -1,7 +1,7 @@
 import main as dh
 from tools import *
 
-path = "data/stl/complex_hollow_cube.stl"
+path = "data/stl/cube.stl"
 
 dh.clear_output_paths()
 dh.get_stl_info(path,dh.info_output_dir)
