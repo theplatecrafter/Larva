@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "school_project"
+name = "Larva"
 version = "0.1.0"
 description = ""
 authors = ["Toren C <theplatecrafter@gmail.com>"]
@@ -17,6 +17,12 @@ scikit-image = "^0.23.2"
 shapely = "^2.0.4"
 moviepy = "^1.0.3"
 xlsxwriter = "^3.2.0"
+invoke = "^2.2.0"
+pyopengl = "^3.1.7"
+pyopengl-accelerate = "^3.1.7"
+glfw = "^2.7.0"
+glm = "^0.4.4"
+mayavi = "^4.8.2"
 
 [tool.poetry.dev-dependencies]
 ipykernel = "^6.29.4"

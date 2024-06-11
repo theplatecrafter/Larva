@@ -1,4 +1,4 @@
-from tools import *
+from .tools import *
 
 
 # set output folders
@@ -11,6 +11,8 @@ info_output_dir = "output/infos"
 video_output_dir = "output/video"
 
 try:
+    os.mkdir("output")
+    os.mkdir("output/CAD")
     os.mkdir(body_output_dir)
     os.mkdir(dwg_output_dir)
     os.mkdir(image_output_dir)
@@ -21,22 +23,6 @@ except Exception:
     pass
 
 ## local functions
-def force_remove_all(directory_path):
-    if not os.path.exists(directory_path):
-        print(f"The directory {directory_path} does not exist.")
-        return
-    for item in os.listdir(directory_path):
-        item_path = os.path.join(directory_path, item)
-        try:
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            else:
-                os.remove(item_path)
-        except Exception as e:
-            print(f"Failed to remove {item_path}: {e}")
-
-    print(f"All files and directories in {directory_path} have been removed.")
-
 def clear_output_paths():
     force_remove_all(body_output_dir)
     force_remove_all(dwg_output_dir)

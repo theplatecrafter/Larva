@@ -19,3 +19,10 @@
 /poetry.toml
 
 output/*
+for_presentation/__pycache__
+for_presentation/out/*
+
+Larva/__pycache__
+
+sandbox/__pycache__
+tests/__pycache__

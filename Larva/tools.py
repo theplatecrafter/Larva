@@ -15,6 +15,21 @@ import math
 import xlsxwriter as xlsw
 from matplotlib.colors import hsv_to_rgb
 
+def force_remove_all(directory_path):
+    if not os.path.exists(directory_path):
+        print(f"The directory {directory_path} does not exist.")
+        return
+    for item in os.listdir(directory_path):
+        item_path = os.path.join(directory_path, item)
+        try:
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+        except Exception as e:
+            print(f"Failed to remove {item_path}: {e}")
+
+    print(f"All files and directories in {directory_path} have been removed.")
 
 def rmSame(x: list) -> list:
     """removes any duplicated values"""
