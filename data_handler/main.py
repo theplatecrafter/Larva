@@ -386,7 +386,7 @@ def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_fil
     createSimpleXLSX(["#","p1","p2","p3"],triangles,output_path,"info")
 
     extract_bodies_from_stl(path_to_stl,body_path)
-    files = [i for i in os.listdir(body_path) if i.lower()endswith(".stl")]
+    files = [i for i in os.listdir(body_path) if i.lower().endswith(".stl")]
     for i in range(len(files)):
         file_path = os.path.join(body_path,files[i])
         view_stl(file_path,body_image_path,f"Body_{i}.png",bounding_box,False,True)
