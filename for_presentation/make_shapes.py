@@ -31,29 +31,39 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", 
     ax = fig.add_subplot(111, projection='3d')
 
     polygons = []
-    for i in range(len(target_stl.vectors)):
-        tri = target_stl.vectors[i]
-        polygons.append(tri)
+
+
+
+
+
+
+    polygonToAdd = np.array([
+        [-57,38,10],
+        [-57,62,10],
+        [-33,62,10],
+        [-33,38,10],
+    ])
+    polygons.append(polygonToAdd)
+
+    polygonToAdd = np.array([
+        [-48,45,11],
+        [-47,52,11],
+        [-36,55,11],
+    ])
+    polygons.append(polygonToAdd)
+
+
+
 
     # Generate a colormap with unique colors
     cmap = plt.get_cmap('tab20', len(polygons))
     colors = [cmap(i) for i in range(len(polygons))]
-
     poly_collection = Poly3DCollection(polygons, linewidths=1, edgecolors='k')
 
     # Assign a different color to each triangle
     poly_collection.set_facecolors(colors)
 
     ax.add_collection3d(poly_collection)
-
-    # Add the plane after adding the object
-    plane = np.array([
-        [-57, 38, 10],
-        [-57, 62, 10],
-        [-33, 62, 10],
-        [-33, 38, 10],
-    ])
-    ax.add_collection3d(Poly3DCollection([plane], facecolors='blue', edgecolors='k', alpha=0.5))
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -76,8 +86,6 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", 
         }
         return plt, info
     return plt
-
-
 
 force_remove_all("for_presentation/out")
 view_stl("data/stl/cube.stl","for_presentation/out")

@@ -334,8 +334,14 @@ def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_po
                 out[i] = out[i][:-1]
             out = rmSame(out)
             if len(out) != 1:
+                if len(out) == 2:
+                    out.append(out[0])
+                    out.append(out[1])
+                elif len(out) == 3:
+                    out.append(out[0])
                 msp.add_lwpolyline(out)
-                print(f"{n}: Created {len(out)}-point LWPOLYLINE : {out}\ntriangle:{triangle}")
+
+                print(f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}")
             
     file_out = os.path.join(output_dir,output_base_name+".dwg")
     dwg.saveas(file_out)
@@ -573,3 +579,8 @@ def slice_obj_file(input_file, slice_thickness, output_dir):
         output_file = os.path.join(output_dir, f"slice_{i}.dwg")
         dxf.saveas(output_file)
         print(f"created sliced obj file to {output_file}")
+
+def width_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlaneNormal:list = [0,0,1],outputFolderName:str = "stl_slices"):
+    stl_model = m.Mesh.from_file(stl_path)
+    points = np.unique(stl_model.vectors.reshape([-1, 3]), axis=0)
+    
