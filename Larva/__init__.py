@@ -9,6 +9,7 @@ obj_output_dir = "output/CAD/obj"
 stl_output_dir = "output/CAD/stl"
 info_output_dir = "output/infos"
 video_output_dir = "output/video"
+slices_output_dir = "output/slices"
 
 try:
     os.mkdir("output")
@@ -19,6 +20,8 @@ try:
     os.mkdir(obj_output_dir)
     os.mkdir(stl_output_dir)
     os.mkdir(info_output_dir)
+    os.mkdir(video_output_dir)
+    os.mkdir(slices_output_dir)
 except Exception:
     pass
 
@@ -31,11 +34,14 @@ def clear_output_paths():
     force_remove_all(stl_output_dir)
     force_remove_all(info_output_dir)
     force_remove_all(video_output_dir)
+    force_remove_all(slices_output_dir)
 
 
 # global functions
-def removeUnneededlines(path_to_dwg:str,output_path:str,triangleErrorRange:float = 0,output_name:str="fixed_dwg"):
-    doc = ezdxf.readfile(path_to_dwg)
+def removeUnneededlinesFromFile(path_to_dwg:str,output_path:str,triangleErrorRange:float = 0,output_name:str="fixed_dwg"):
+    removeUnneededlines(ezdxf.readfile(path_to_dwg),triangleErrorRange).saveas(os.path.join(output_path,output_name+".dwg"))
+
+def removeUnneededlines(doc,triangleErrorRange:float = 0):
     msp = doc.modelspace()
     t = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
 
@@ -58,8 +64,7 @@ def removeUnneededlines(path_to_dwg:str,output_path:str,triangleErrorRange:float
     for i in invTri:
         newMSP.add_lwpolyline(i)
     
-    print(f"created new modulespace with {len(invTri)} lines")
-    newDoc.saveas(os.path.join(output_path,f"{output_name}.dwg"))
+    return newDoc
 
 def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_file_infos"):
     output_path = os.path.join(output_path,outputfoldername)
@@ -316,16 +321,16 @@ def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: st
 
     return bodies
 
-def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_base_name: str = "sliced"):
+def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_base_name: str = "sliced",printDeets:bool = False):
     os.makedirs(output_dir, exist_ok=True)
 
     dwg = ezdxf.new()
     msp = dwg.modelspace()
-    stl_model = m.Mesh.from_file(stl_path)
+    stl_model = align_mesh_to_cutting_plane(m.Mesh.from_file(stl_path),np.array(slicing_plane_normal),np.array(slicing_plane_point))
 
     n=0
     for triangle in stl_model.vectors:
-        out = SliceTriangleAtPlane(np.array(slicing_plane_normal),np.array(slicing_plane_point),triangle)
+        out = SliceTriangleAtPlane(np.array([0,0,1]),np.array([0,0,0]),triangle,printDeets)
         if out != None:
             n+=1
             zPlane = []
@@ -341,10 +346,11 @@ def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_po
                     out.append(out[0])
                 msp.add_lwpolyline(out)
 
-                print(f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}")
+                printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}")
             
     file_out = os.path.join(output_dir,output_base_name+".dwg")
     dwg.saveas(file_out)
+    return dwg
 
 def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_file_infos"):
     output_path = os.path.join(output_path,outputfoldername)
@@ -580,7 +586,34 @@ def slice_obj_file(input_file, slice_thickness, output_dir):
         dxf.saveas(output_file)
         print(f"created sliced obj file to {output_file}")
 
-def width_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlaneNormal:list = [0,0,1],outputFolderName:str = "stl_slices"):
+def width_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlaneNormal:list = [0,0,1],outputFolderName:str = "stl_slices",printDeets:bool = False,withExtra:bool = False):
+    outFolder = os.path.join(outputFolder,outputFolderName)
+    os.mkdir(outFolder)
+    CADFolder = os.path.join(outFolder,"slicesDATA")
+    os.mkdir(CADFolder)
+    if withExtra:
+        IMGFolder = os.path.join(outFolder,"sliceIMG")
+        os.mkdir(IMGFolder)
+
+    docList = []
     stl_model = m.Mesh.from_file(stl_path)
     points = np.unique(stl_model.vectors.reshape([-1, 3]), axis=0)
-    
+    slicePlaneNormal = np.array(slicePlaneNormal)
+    out = find_signed_min_max_distances(points,slicePlaneNormal)
+    minPoint = out[0]
+    maxPoint = out[2]
+    sliceNumbers = math.ceil(np.linalg.norm(maxPoint-minPoint)/sliceWidth)-1
+    slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i for i in range(sliceNumbers)]
+    for i in range(len(slicePlanePoints)):
+        docList.append(removeUnneededlines(slice_stl_to_dwg(stl_path,list(slicePlaneNormal),list(slicePlanePoints[i]),CADFolder,f"slice{i+1}")))
+        printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: sliced mesh with plane point: {slicePlanePoints[i]}")
+        if withExtra:
+            view_dwg(os.path.join(CADFolder,f"slice{i+1}.dwg"),IMGFolder,f"slice{i+1}.png")
+        printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: created image file")
+    if withExtra:
+        png_to_mp4(IMGFolder,outFolder,"slices")
+
+    combinedDOC = pack_dwg_files_no_overlap(docList)
+    combinedDOC.saveas(os.path.join(outFolder,"slice_combined.dwg"))
+    if withExtra:
+        view_dwg(os.path.join(outFolder,"slice_combined.dwg"),outFolder,"slice_combined.png")

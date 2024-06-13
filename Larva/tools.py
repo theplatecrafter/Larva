@@ -14,6 +14,8 @@ from moviepy.editor import ImageSequenceClip
 import math
 import xlsxwriter as xlsw
 from matplotlib.colors import hsv_to_rgb
+from scipy.spatial.transform import Rotation as R
+from ezdxf.math import BoundingBox, Vec3
 
 def force_remove_all(directory_path):
     if not os.path.exists(directory_path):
@@ -183,3 +185,157 @@ def SliceTriangleAtPlane(planeNormal: np.ndarray, planePoint: np.ndarray, triang
         return unique_points
 
     return None
+
+
+def align_mesh_to_cutting_plane(stl_mesh, plane_normal, plane_point):
+    # Normalize the plane normal
+    plane_normal = plane_normal / np.linalg.norm(plane_normal)
+    
+    # Define the standard plane normal (z-axis)
+    standard_normal = np.array([0, 0, 1])
+    
+    # Calculate the rotation axis (cross product of plane_normal and standard_normal)
+    rotation_axis = np.cross(plane_normal, standard_normal)
+    if np.linalg.norm(rotation_axis) == 0:
+        # Vectors are parallel, no need to rotate
+        rotation_matrix = np.eye(3)
+    else:
+        rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)
+        # Calculate the rotation angle (dot product and arccosine)
+        dot_product = np.dot(plane_normal, standard_normal)
+        rotation_angle = np.arccos(np.clip(dot_product, -1.0, 1.0))
+        # Create the rotation matrix using the axis and angle
+        rotation_matrix = R.from_rotvec(rotation_angle * rotation_axis).as_matrix()
+    
+    # Translate the mesh so that the plane point becomes the origin
+    translation_vector = -plane_point
+    
+    # Apply the rotation and translation to the mesh
+    stl_mesh.translate(translation_vector)
+    stl_mesh.vectors = np.dot(stl_mesh.vectors, rotation_matrix.T)
+    
+    return stl_mesh
+
+def signed_point_to_plane_distance(plane_normal, plane_point):
+    plane_normal = np.array(plane_normal)
+    plane_point = np.array(plane_point)
+    
+    # Distance formula without absolute value to keep the sign
+    distance = np.dot(plane_normal, plane_point) / np.linalg.norm(plane_normal)
+    return distance
+
+def find_signed_min_max_distances(points, plane_normal):
+    min_distance = float('inf')
+    max_distance = float('-inf')
+    min_point = None
+    max_point = None
+
+    for point in points:
+        distance = signed_point_to_plane_distance(plane_normal, point)
+        
+        if distance < min_distance:
+            min_distance = distance
+            min_point = point
+        
+        if distance > max_distance:
+            max_distance = distance
+            max_point = point
+    
+    return min_point, min_distance, max_point, max_distance
+
+def get_entity_extents(entity):
+    if entity.dxftype() == 'LWPOLYLINE':
+        # Initialize extents with None to find minimum and maximum points
+        min_point = None
+        max_point = None
+        
+        for vertex in entity.vertices():
+            # Vertex is a tuple (x, y[, z]) - handle both 2D and 3D vertices
+            x, y, z = vertex[:3] if len(vertex) >= 3 else (vertex[0], vertex[1], 0)  # Assume z = 0 for 2D vertices
+            
+            if min_point is None:
+                min_point = [x, y, z]
+                max_point = [x, y, z]
+            else:
+                min_point[0] = min(min_point[0], x)
+                min_point[1] = min(min_point[1], y)
+                min_point[2] = min(min_point[2], z)
+                max_point[0] = max(max_point[0], x)
+                max_point[1] = max(max_point[1], y)
+                max_point[2] = max(max_point[2], z)
+        
+        return min_point, max_point
+    
+    elif entity.dxftype() in ['LINE', 'POLYLINE']:
+        # For LINE and POLYLINE, return the start and end points
+        start_point = list(entity.dxf.start)[:3]
+        end_point = list(entity.dxf.end)[:3]
+        return start_point, end_point
+    
+    else:
+        # Handle other entity types or return default extents
+        return [0, 0, 0], [0, 0, 0]
+
+def translate_entities(entities, translation):
+    new_entities = []
+    
+    for entity in entities:
+        if entity.dxftype() == 'LWPOLYLINE':
+            new_entity = entity.copy()
+            for i in range(len(new_entity)):
+                new_entity[i] = (new_entity[i][0] + translation[0], new_entity[i][1] + translation[1], new_entity[i][2] + translation[2])
+            new_entities.append(new_entity)
+        else:
+            start_point, end_point = get_entity_extents(entity)
+            new_entity = entity.copy()
+            new_entity.dxf.start = (start_point[0] + translation[0], start_point[1] + translation[1], start_point[2] + translation[2])
+            new_entity.dxf.end = (end_point[0] + translation[0], end_point[1] + translation[1], end_point[2] + translation[2])
+            new_entities.append(new_entity)
+    
+    return new_entities
+
+def pack_dwg_files_no_overlap(docs):
+    combined_doc = ezdxf.new()
+    combined_msp = combined_doc.modelspace()
+    current_position = (0, 0, 0)
+    
+    for doc in docs:
+        entities = doc.modelspace()
+        
+        min_point = [float('inf'), float('inf'), float('inf')]
+        max_point = [-float('inf'), -float('inf'), -float('inf')]
+        
+        # Find extents of all entities in the document
+        for entity in entities:
+            entity_min, entity_max = get_entity_extents(entity)
+            
+            min_point[0] = min(min_point[0], entity_min[0])
+            min_point[1] = min(min_point[1], entity_min[1])
+            min_point[2] = min(min_point[2], entity_min[2])
+            
+            max_point[0] = max(max_point[0], entity_max[0])
+            max_point[1] = max(max_point[1], entity_max[1])
+            max_point[2] = max(max_point[2], entity_max[2])
+        
+        # Calculate translation vector
+        translation = (
+            current_position[0] - min_point[0],
+            current_position[1] - min_point[1],
+            current_position[2] - min_point[2]
+        )
+        
+        # Translate entities in the DWG file and collect new entities
+        new_entities = translate_entities(entities, translation)
+        
+        # Add new entities to the combined document
+        for new_entity in new_entities:
+            combined_msp.add_entity(new_entity)
+        
+        # Update current_position for the next DWG
+        current_position = (
+            max_point[0] + 10,  # Adding 10 units as a gap to avoid overlap
+            current_position[1],
+            current_position[2]
+        )
+    
+    return combined_doc
