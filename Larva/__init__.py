@@ -321,9 +321,7 @@ def extract_bodies_from_stl(stl_path: str, output_dir: str, output_base_name: st
 
     return bodies
 
-def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_base_name: str = "sliced",printDeets:bool = False):
-    os.makedirs(output_dir, exist_ok=True)
-
+def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_base_name: str = "sliced",printDeets:bool = False,justDOC:bool = False):
     dwg = ezdxf.new()
     msp = dwg.modelspace()
     stl_model = align_mesh_to_cutting_plane(m.Mesh.from_file(stl_path),np.array(slicing_plane_normal),np.array(slicing_plane_point))
@@ -348,8 +346,10 @@ def slice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_po
 
                 printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}")
             
-    file_out = os.path.join(output_dir,output_base_name+".dwg")
-    dwg.saveas(file_out)
+    if not justDOC:
+        os.makedirs(output_dir, exist_ok=True)
+        file_out = os.path.join(output_dir,output_base_name+".dwg")
+        dwg.saveas(file_out)
     return dwg
 
 def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_file_infos"):
@@ -605,7 +605,9 @@ def width_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlaneNor
     sliceNumbers = math.ceil(np.linalg.norm(maxPoint-minPoint)/sliceWidth)-1
     slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
-        docList.append(removeUnneededlines(slice_stl_to_dwg(stl_path,list(slicePlaneNormal),list(slicePlanePoints[i]),CADFolder,f"slice{i+1}")))
+        doc = removeUnneededlines(slice_stl_to_dwg(stl_path,list(slicePlaneNormal),list(slicePlanePoints[i]),None,None,False,True))
+        doc.saveas(os.path.join(CADFolder,f"slice{i+1}.dwg"))
+        docList.append(doc)
         printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: sliced mesh with plane point: {slicePlanePoints[i]}")
         if withExtra:
             view_dwg(os.path.join(CADFolder,f"slice{i+1}.dwg"),IMGFolder,f"slice{i+1}.png")

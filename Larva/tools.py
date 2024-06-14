@@ -137,12 +137,37 @@ def LineSegmentPlaneCollision(planeNormal: np.ndarray, planePoint: np.ndarray, a
 
     point = LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, printDeets=printDeets)
     if point is not None:
-        n = np.linalg.norm(point - a0) / np.linalg.norm(a1 - a0)
-        printIF(printDeets, f"Intersection parameter n: {n}")
-        if 0 <= n <= 1:
+        if is_point_on_segment(a0,a1,point):
             return tuple(point)
 
     return None
+
+def is_point_on_segment(A, B, I, epsilon=0):
+    # Check bounding box conditions
+    in_box_x = min(A[0], B[0]) <= I[0] <= max(A[0], B[0])
+    in_box_y = min(A[1], B[1]) <= I[1] <= max(A[1], B[1])
+    in_box_z = min(A[2], B[2]) <= I[2] <= max(A[2], B[2])
+
+    # Check if point I is within the bounding box
+    if not (in_box_x and in_box_y and in_box_z):
+        return False
+
+    # Check for collinearity
+    AB = B - A
+    AI = I - A
+
+    # Cross product to check if the direction is the same
+    cross_product = np.cross(AB, AI)
+    if not np.all(np.abs(cross_product) < epsilon):
+        return False
+
+    # Parameter t should be in [0, 1] for point I to be between A and B
+    dot_product = np.dot(AI, AB)
+    length_squared = np.dot(AB, AB)
+    t = dot_product / length_squared
+
+    return 0 <= t <= 1
+
 
 def SliceTriangleAtPlane(planeNormal: np.ndarray, planePoint: np.ndarray, triangle: list, printDeets=False):
     a, b, c = np.array(triangle[0]), np.array(triangle[1]), np.array(triangle[2])
