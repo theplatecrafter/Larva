@@ -1,7 +1,5 @@
-import Larva as dh
+from Larva import direct_data_handler as dfm
+path = "data/stl/complex_stl/thankyou_for_listening.stl"
 
-path = "data/stl/complex_hollow_cube.stl"
-
-dh.clear_output_paths()
-dh.view_stl(path,dh.image_output_dir)
-dh.width_slice_stl(path,dh.slices_output_dir,1.0,[0,0,1],"stl_slices",True,True)
+dfm.clear_output_paths
+dfm.view_stl(path,dfm.image_output_dir,"stl.png",True,True,None,(20000,15000))
