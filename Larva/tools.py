@@ -17,6 +17,9 @@ from matplotlib.colors import hsv_to_rgb
 from scipy.spatial.transform import Rotation as R
 from ezdxf.math import BoundingBox, Vec3
 
+
+from .read_terminal import *
+
 ## local
 def force_remove_all(directory_path):
     if not os.path.exists(directory_path):
@@ -33,44 +36,6 @@ def force_remove_all(directory_path):
             print(f"Failed to remove {item_path}: {e}")
 
     print(f"All files and directories in {directory_path} have been removed.")
-
-## from mislanious scripts
-def rmSame(x: list) -> list:
-    """removes any duplicated values"""
-    y = []
-    for i in x:
-        if i not in y:
-            y.append(i)
-    return y
-
-def png_to_mp4(image_folder:str, output_folder:str,filename:str = "movie", fps=None):
-    filename += ".mp4"
-    image_files = sorted([os.path.join(image_folder, img)
-                          for img in os.listdir(image_folder)
-                          if img.endswith(".png")])
-    
-    if fps == None:
-        fps = int(math.log(len(image_files)+1,1.3))
-
-    clip = ImageSequenceClip(image_files, fps=fps)
-    
-    clip.write_videofile(os.path.join(output_folder,filename), codec="libx264")
-
-def createSimpleXLSX(collumNames:list,collumContent:list,output_folder:str,output_name:str="xls"):
-    workbook = xlsw.Workbook(os.path.join(output_folder,output_name+".xlsx"))
-    worksheet = workbook.add_worksheet()
-    for i in range(len(collumNames)):
-        worksheet.write(0,i,collumNames[i])
-    for i in range(len(collumContent)):
-        for j in range(len(collumContent[i])):
-            worksheet.write(j+1,i,collumContent[i][j])
-    
-    workbook.close()
-
-def printIF(boolean:bool,printString:str):
-    """prints printString if boolean == True"""
-    if boolean:
-        print(printString)
 
 ## stl slicing
 def ccw(A, B, C):
@@ -94,7 +59,7 @@ def is_valid_triangle(points:list,maxArea:float = 0):
     
     return calculateAreaOfTriangle(points) > maxArea
 
-def calculateAreaOfTriangle(points:list):
+def calculateAreaOfTriangle(points:list,printDeets:bool = False):
     if len(points) != 3:
         raise ValueError("Input must be a list of three tuples representing the vertices of a triangle.")
     
@@ -102,28 +67,20 @@ def calculateAreaOfTriangle(points:list):
 
     # Calculate the area using the determinant method
     area = 0.5 * abs(x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2))
+    printIF(printDeets,f"triangle of points {points} has area of {area}","calculateAreaOfTriangle")
     return area
-
-def create_dwg_outof_lines(lines,out):
-    newDWG = ezdxf.new()
-    msp = newDWG.modelspace()
-
-    for line in lines:
-        msp.add_line(line[0],line[1])
-    
-    newDWG.saveas(out)
 
 def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=0, printDeets=False):
     ndotu = np.dot(planeNormal, rayDirection)
     printIF(printDeets, f"ndotu: {ndotu}")
     if abs(ndotu) < epsilon:
-        printIF(printDeets, "No intersection, the line is parallel to the plane.")
+        printIF(printDeets, "No intersection, the line is parallel to the plane.","LinePlaneCollision")
         return None
 
     w = rayPoint - planePoint
     si = -np.dot(planeNormal, w) / ndotu
     Psi = rayPoint + si * rayDirection
-    printIF(printDeets, f"Collision Point: {Psi}")
+    printIF(printDeets, f"Collision Point {Psi}","LinePlaneCollision")
     return Psi
 
 def LineSegmentPlaneCollision(planeNormal: np.ndarray, planePoint: np.ndarray, a0: np.ndarray, a1: np.ndarray, printDeets=False):
@@ -132,53 +89,54 @@ def LineSegmentPlaneCollision(planeNormal: np.ndarray, planePoint: np.ndarray, a
     planeNormal = np.array(planeNormal)
     planePoint = np.array(planePoint)
 
-    printIF(printDeets, f"Checking line segment: {a0} to {a1}")
+    printIF(printDeets, f"Checking line segment: {a0} to {a1}","LineSegmentPlaneCollision")
 
     if np.isclose(np.dot(planeNormal, planePoint - a0), 0) and np.isclose(np.dot(planeNormal, planePoint - a1), 0):
-        printIF(printDeets, "The line segment is on the plane.")
+        printIF(printDeets, "The line segment is on the plane.","LineSegmentPlaneCollision")
         return [tuple(a0), tuple(a1)]
 
-    point = LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, printDeets=printDeets)
+    point = LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, printDeets)
+    printIF(printDeets, f"intersection point {point}","LineSegmentPlaneCollision")
     if point is not None:
         if is_point_on_segment(a0,a1,point):
+            printIF(printDeets, f"{point} is between {a0} and {a1}","LineSegmentPlaneCollision")
             return tuple(point)
+    
+    printIF(printDeets, f"{point} is not between {a0} and {a1}","LineSegmentPlaneCollision")
 
     return None
 
-def is_point_on_segment(A, B, I, epsilon=0):
+def is_point_on_segment(A, B, I, epsilon=1e-8):
     # Check bounding box conditions
-    in_box_x = min(A[0], B[0]) <= I[0] <= max(A[0], B[0])
-    in_box_y = min(A[1], B[1]) <= I[1] <= max(A[1], B[1])
-    in_box_z = min(A[2], B[2]) <= I[2] <= max(A[2], B[2])
+    in_box_x = min(A[0], B[0]) - epsilon <= I[0] <= max(A[0], B[0]) + epsilon
+    in_box_y = min(A[1], B[1]) - epsilon <= I[1] <= max(A[1], B[1]) + epsilon
+    in_box_z = min(A[2], B[2]) - epsilon <= I[2] <= max(A[2], B[2]) + epsilon
 
     # Check if point I is within the bounding box
     if not (in_box_x and in_box_y and in_box_z):
         return False
 
-    # Check for collinearity
+    # Check for collinearity using dot products
     AB = B - A
     AI = I - A
+    BI = I - B
 
-    # Cross product to check if the direction is the same
-    cross_product = np.cross(AB, AI)
-    if not np.all(np.abs(cross_product) < epsilon):
+    # If the point I is collinear with A and B, then the vectors AI and BI should be oppositely directed
+    collinear = np.dot(AI, AB) >= 0 and np.dot(BI, AB) <= 0
+    if not collinear:
         return False
 
-    # Parameter t should be in [0, 1] for point I to be between A and B
-    dot_product = np.dot(AI, AB)
-    length_squared = np.dot(AB, AB)
-    t = dot_product / length_squared
-
-    return 0 <= t <= 1
+    # If all conditions are met, then I is on the line segment AB
+    return True
 
 def SliceTriangleAtPlane(planeNormal: np.ndarray, planePoint: np.ndarray, triangle: list, printDeets=False):
     a, b, c = np.array(triangle[0]), np.array(triangle[1]), np.array(triangle[2])
-    printIF(printDeets, f"Triangle vertices: {a}, {b}, {c}")
+    printIF(printDeets, f"Triangle vertices: {a}, {b}, {c}    slicing plane normal = {planeNormal} slicing plane point = {planePoint}","SliceTriangleAtPlane")
     check0 = LineSegmentPlaneCollision(planeNormal, planePoint, a, b, printDeets=printDeets)
     check1 = LineSegmentPlaneCollision(planeNormal, planePoint, b, c, printDeets=printDeets)
     check2 = LineSegmentPlaneCollision(planeNormal, planePoint, c, a, printDeets=printDeets)
 
-    printIF(printDeets, f"Intersections: {check0}, {check1}, {check2}")
+    printIF(printDeets, f"Intersections: {check0}, {check1}, {check2}","SliceTriangleAtPlane")
 
     if check0 is None and check1 is None and check2 is None:
         return None
@@ -213,7 +171,7 @@ def SliceTriangleAtPlane(planeNormal: np.ndarray, planePoint: np.ndarray, triang
 
     return None
 
-def align_mesh_to_cutting_plane(stl_mesh, plane_normal, plane_point):
+def align_mesh_to_cutting_plane(stl_mesh, plane_normal, plane_point,printDeets=False):
     # Normalize the plane normal
     plane_normal = plane_normal / np.linalg.norm(plane_normal)
     
@@ -239,6 +197,7 @@ def align_mesh_to_cutting_plane(stl_mesh, plane_normal, plane_point):
     # Apply the rotation and translation to the mesh
     stl_mesh.translate(translation_vector)
     stl_mesh.vectors = np.dot(stl_mesh.vectors, rotation_matrix.T)
+    printIF(printDeets,f"translation vector: {translation_vector}   rotation axis: {rotation_axis}","align_mesh_to_cutting_plane")
     
     return stl_mesh
 
@@ -268,57 +227,6 @@ def find_signed_min_max_distances(points, plane_normal):
             max_point = point
     
     return min_point, min_distance, max_point, max_distance
-
-def get_entity_extents(entity):
-    if entity.dxftype() == 'LWPOLYLINE':
-        # Initialize extents with None to find minimum and maximum points
-        min_point = None
-        max_point = None
-        
-        for vertex in entity.vertices():
-            # Vertex is a tuple (x, y[, z]) - handle both 2D and 3D vertices
-            x, y, z = vertex[:3] if len(vertex) >= 3 else (vertex[0], vertex[1], 0)  # Assume z = 0 for 2D vertices
-            
-            if min_point is None:
-                min_point = [x, y, z]
-                max_point = [x, y, z]
-            else:
-                min_point[0] = min(min_point[0], x)
-                min_point[1] = min(min_point[1], y)
-                min_point[2] = min(min_point[2], z)
-                max_point[0] = max(max_point[0], x)
-                max_point[1] = max(max_point[1], y)
-                max_point[2] = max(max_point[2], z)
-        
-        return min_point, max_point
-    
-    elif entity.dxftype() in ['LINE', 'POLYLINE']:
-        # For LINE and POLYLINE, return the start and end points
-        start_point = list(entity.dxf.start)[:3]
-        end_point = list(entity.dxf.end)[:3]
-        return start_point, end_point
-    
-    else:
-        # Handle other entity types or return default extents
-        return [0, 0, 0], [0, 0, 0]
-
-def translate_entities(entities, translation):
-    new_entities = []
-    
-    for entity in entities:
-        if entity.dxftype() == 'LWPOLYLINE':
-            new_entity = entity.copy()
-            for i in range(len(new_entity)):
-                new_entity[i] = (new_entity[i][0] + translation[0], new_entity[i][1] + translation[1], new_entity[i][2] + translation[2])
-            new_entities.append(new_entity)
-        else:
-            start_point, end_point = get_entity_extents(entity)
-            new_entity = entity.copy()
-            new_entity.dxf.start = (start_point[0] + translation[0], start_point[1] + translation[1], start_point[2] + translation[2])
-            new_entity.dxf.end = (end_point[0] + translation[0], end_point[1] + translation[1], end_point[2] + translation[2])
-            new_entities.append(new_entity)
-    
-    return new_entities
 
 ## view
 def view_stl_dev(stl_path: str, output_dir: str, output_name: str = "stl_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave:bool = False):
@@ -389,9 +297,7 @@ def view_stl_dev(stl_path: str, output_dir: str, output_name: str = "stl_view.pn
         return plt
     return plt
 
-def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", 
-             color_triangles: bool = True, keep_aspect_ratio: bool = True, 
-             rotation_angles: tuple = None, resolution: tuple = (1600, 1200), margin: float = 0.1):
+def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", color_triangles: bool = True, keep_aspect_ratio: bool = True, rotation_angles: tuple = None, resolution: tuple = (1600, 1200), margin: float = 0.1):
     # Load the STL file
     your_mesh = m.Mesh.from_file(stl_path)
     
@@ -539,6 +445,60 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
     else:
         return plt
 
+## plane combine
+def get_entity_extents(entity,printDeets=False):
+    if entity.dxftype() == 'LWPOLYLINE':
+        # Initialize extents with None to find minimum and maximum points
+        min_point = None
+        max_point = None
+        
+        for vertex in entity.vertices():
+            # Vertex is a tuple (x, y[, z]) - handle both 2D and 3D vertices
+            x, y, z = vertex[:3] if len(vertex) >= 3 else (vertex[0], vertex[1], 0)  # Assume z = 0 for 2D vertices
+            
+            if min_point is None:
+                min_point = [x, y, z]
+                max_point = [x, y, z]
+            else:
+                min_point[0] = min(min_point[0], x)
+                min_point[1] = min(min_point[1], y)
+                min_point[2] = min(min_point[2], z)
+                max_point[0] = max(max_point[0], x)
+                max_point[1] = max(max_point[1], y)
+                max_point[2] = max(max_point[2], z)
+        printIF(printDeets,f"entity is LWPOLYLINE. min points: {min_point}, max points: {max_point}","get_entity_extents")
+        
+        return min_point, max_point
+    elif entity.dxftype() in ['LINE', 'POLYLINE']:
+        # For LINE and POLYLINE, return the start and end points
+        start_point = list(entity.dxf.start)[:3]
+        end_point = list(entity.dxf.end)[:3]
+        printIF(printDeets,f"entity is LINE or POLYLINE. start point: {start_point}, end point: {end_point}","get_entity_extents")
+        return start_point, end_point
+    else:
+        printIF(printDeets,"could not read entity","get_entity_extents")
+        # Handle other entity types or return default extents
+        return [0, 0, 0], [0, 0, 0]
+
+def translate_entities(entities, translation,printDeets=False):
+    new_entities = []
+    
+    for entity in entities:
+        if entity.dxftype() == 'LWPOLYLINE':
+            new_entity = entity.copy()
+            for i in range(len(new_entity)):
+                new_entity[i] = (new_entity[i][0] + translation[0], new_entity[i][1] + translation[1], new_entity[i][2] + translation[2])
+            new_entities.append(new_entity)
+        else:
+            start_point, end_point = get_entity_extents(entity)
+            new_entity = entity.copy()
+            new_entity.dxf.start = (start_point[0] + translation[0], start_point[1] + translation[1], start_point[2] + translation[2])
+            new_entity.dxf.end = (end_point[0] + translation[0], end_point[1] + translation[1], end_point[2] + translation[2])
+            new_entities.append(new_entity)
+    
+    printIF(printDeets,f"translated entities to {translation}","translate_entities")
+    return new_entities
+
 ## other
 def rotate(vertices, angles):
     # Convert angles from degrees to radians
@@ -563,3 +523,45 @@ def rotate(vertices, angles):
     # Rotate the vertices
     rotated_vertices = np.dot(vertices, R.T)
     return rotated_vertices
+
+def print_styled(text, color_code, style_code="0",end="\n"):
+    print(f"\033[{style_code};{color_code}m{text}\033[0m",end=end)
+
+def rmSame(x: list) -> list:
+    """removes any duplicated values"""
+    y = []
+    for i in x:
+        if i not in y:
+            y.append(i)
+    return y
+
+def png_to_mp4(image_folder:str, output_folder:str,filename:str = "movie", fps=None):
+    filename += ".mp4"
+    image_files = sorted([os.path.join(image_folder, img)
+                          for img in os.listdir(image_folder)
+                          if img.endswith(".png")])
+    
+    if fps == None:
+        fps = int(math.log(len(image_files)+1,1.3))
+
+    clip = ImageSequenceClip(image_files, fps=fps)
+    
+    clip.write_videofile(os.path.join(output_folder,filename), codec="libx264")
+
+def createSimpleXLSX(collumNames:list,collumContent:list,output_folder:str,output_name:str="xls"):
+    workbook = xlsw.Workbook(os.path.join(output_folder,output_name+".xlsx"))
+    worksheet = workbook.add_worksheet()
+    for i in range(len(collumNames)):
+        worksheet.write(0,i,collumNames[i])
+    for i in range(len(collumContent)):
+        for j in range(len(collumContent[i])):
+            worksheet.write(j+1,i,collumContent[i][j])
+    
+    workbook.close()
+
+def printIF(boolean:bool,printString:str,precursor:str = "sys"):
+    """prints printString if boolean == True"""
+    if boolean:
+        print_styled(precursor+":",33,"1",end=" ")
+        print(printString)
+

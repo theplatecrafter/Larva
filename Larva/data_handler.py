@@ -2,7 +2,7 @@ from .tools import *
 
 
 # global function
-def removeUnneededlines(doc,triangleErrorRange:float = 0):
+def removeUnneededlines(doc,triangleErrorRange:float = 0,printDeets:bool = False):
     msp = doc.modelspace()
     t = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
 
@@ -14,7 +14,7 @@ def removeUnneededlines(doc,triangleErrorRange:float = 0):
         for j in range(len(p)):
             p[j] = p[j][:2]
         tri.append(p)
-    
+    printIF(printDeets,"extracted triangle datas","removeUnneededlines")
     invTri = []
     for i in rmSame(tri):
         if not is_valid_triangle(i,triangleErrorRange):
@@ -24,10 +24,11 @@ def removeUnneededlines(doc,triangleErrorRange:float = 0):
     newMSP = newDoc.modelspace()
     for i in invTri:
         newMSP.add_lwpolyline(i)
+    printIF(printDeets,"extracted triangle datas","removeUnneededlines")
     
     return newDoc
 
-def return_dwg_parts(doc):
+def return_dwg_parts(doc,printDeets:bool = False):
     msp = doc.modelspace()
     
     poly = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
@@ -36,7 +37,7 @@ def return_dwg_parts(doc):
     docs = []
     for i, lwpolyline in enumerate(poly):
         j+=1
-        print(f"{j+1}/{len(poly)} entites splitted")
+        printIF(printDeets,f"{j+1}/{len(poly)} entites splitted","return_dwg_parts")
         tmpdoc = ezdxf.new()
         tmpmsp = tmpdoc.modelspace()
         
@@ -46,12 +47,11 @@ def return_dwg_parts(doc):
     
     return docs
 
-def return_stl_parts(original_mesh:m.Mesh):
-
+def return_stl_parts(original_mesh:m.Mesh,printDeets:bool = False):
     num_triangles = len(original_mesh)
     meshes = []
     for i, triangle in enumerate(original_mesh.vectors):
-        print(f"{i+1}/{num_triangles} triangles processed")
+        printIF(printDeets,f"{i+1}/{num_triangles} triangles processed","return_stl_parts")
 
         # Create a new mesh with a single triangle
         new_mesh = m.Mesh(np.zeros(1, dtype=m.Mesh.dtype))
@@ -62,7 +62,7 @@ def return_stl_parts(original_mesh:m.Mesh):
     
     return meshes
 
-def return_stl_bodies(stl_mesh:m.Mesh):
+def return_stl_bodies(stl_mesh:m.Mesh,printDeets:bool = False):
     vertices = stl_mesh.vectors.reshape((-1, 3))
     result = label(stl_mesh.vectors[:, :, 0])
 
@@ -74,34 +74,25 @@ def return_stl_bodies(stl_mesh:m.Mesh):
 
     labeled_array = labeled_array.reshape((-1,))
 
+    n = 0
     bodies = []
     for label_idx in range(1, num_labels + 1):
+        n+= 1
         label_vertices = vertices[labeled_array == label_idx]
         body_mesh = m.Mesh(
             np.zeros(label_vertices.shape[0], dtype=m.Mesh.dtype))
         for i, vertex in enumerate(label_vertices):
             body_mesh.vectors[i] = vertex
         bodies.append(body_mesh)
+        printIF(printDeets,f"{n}/{num_labels} bodies loaded","return_stl_bodies")
 
     return bodies
-
-def dwg_get_points(doc):
-    msp = doc.modelspace()
-
-    points = []
-    for entity in msp:
-        for i in entity.get_points():
-            points.append(i)
-    
-    points = rmSame(points)
-    print(points)
-    return points
 
 def slice_stl_to_dwg(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_point:list,printDeets:bool = False):
     dwg = ezdxf.new()
     msp = dwg.modelspace()
-    stl_model = align_mesh_to_cutting_plane(mesh,np.array(slicing_plane_normal),np.array(slicing_plane_point))
-
+    stl_model = align_mesh_to_cutting_plane(mesh,np.array(slicing_plane_normal),np.array(slicing_plane_point),printDeets)
+    translatedModel = 
     n=0
     for triangle in stl_model.vectors:
         out = SliceTriangleAtPlane(np.array([0,0,1]),np.array([0,0,0]),triangle,printDeets)
@@ -120,7 +111,7 @@ def slice_stl_to_dwg(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_poin
                     out.append(out[0])
                 msp.add_lwpolyline(out)
 
-                printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}")
+                printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}","slice_stl_to_dwg")
             
     return dwg
 
@@ -134,20 +125,20 @@ def width_slice_stl(stl_model:m.Mesh,sliceWidth:float,slicePlaneNormal:list = [0
     sliceNumbers = math.ceil(np.linalg.norm(maxPoint-minPoint)/sliceWidth)-1
     slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
-        doc = removeUnneededlines(slice_stl_to_dwg(stl_model,list(slicePlaneNormal),list(slicePlanePoints[i]),None,None,False,True))
+        doc = removeUnneededlines(slice_stl_to_dwg(stl_model,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets),0,printDeets)
         docList.append(doc)
-        printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: sliced mesh with plane point: {slicePlanePoints[i]}")
-        printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: created image file")
-
+        printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: sliced mesh with plane point: {slicePlanePoints[i]}","width_slice_stl")
 
     return docList
 
-def pack_dwg_files_no_overlap(docs):
+def pack_dwg_files_no_overlap(docs,printDeets:bool = False):
     combined_doc = ezdxf.new()
     combined_msp = combined_doc.modelspace()
     current_position = (0, 0, 0)
     
+    n = 0
     for doc in docs:
+        n+=1
         entities = doc.modelspace()
         
         min_point = [float('inf'), float('inf'), float('inf')]
@@ -185,5 +176,6 @@ def pack_dwg_files_no_overlap(docs):
             current_position[1],
             current_position[2]
         )
+        printIF(printDeets,f"{n}/{len(docs)} inserted dwg at {translation}","pack_dwg_files_no_overlap")
     
     return combined_doc
