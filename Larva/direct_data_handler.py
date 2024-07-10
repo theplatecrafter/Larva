@@ -33,7 +33,7 @@ def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_fil
     os.mkdir(output_path)
     out = view_dwg(path_to_dwg,output_path,"dwg.png",None,True,True)
     bounding = out[1]["bounding_box"]
-    DEVreturn_dwg_parts(path_to_dwg,output_path,printDeets)
+    DEVreturn_dwg_parts(path_to_dwg,output_path,printDeets=printDeets)
 
     t = []
 
@@ -64,7 +64,7 @@ def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_fil
         if len(p) == 4:
             p.pop()
         for j in range(len(p)):
-            p[j] = p[j][:2]
+            p[j] = p[j][:3]
         triDATA[2].append(str(p))
         try:
             triDATA[4].append(calculateAreaOfTriangle(p,printDeets))
@@ -126,7 +126,7 @@ def DEVreturn_dwg_parts(path_to_dwg: str, outputdir: str, foldername: str = "dwg
     os.mkdir(out)
     data = return_dwg_parts(ezdxf.readfile(path_to_dwg),printDeets)
     for i in range(len(data)):
-        data[i].saveas(out,f"part{i+1}.dwg")
+        data[i].saveas(os.path.join(out,f"part{i+1}.dwg"))
     
 def DEVreturn_stl_parts(path_to_stl: str, outputdir: str, foldername: str = "stlparts",printDeets:bool = True):
     out = os.path.join(outputdir,foldername)

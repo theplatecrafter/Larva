@@ -88,11 +88,10 @@ def return_stl_bodies(stl_mesh:m.Mesh,printDeets:bool = False):
 
     return bodies
 
-def slice_stl_to_dwg(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_point:list,printDeets:bool = False):
+def slice_stl_to_dwgB(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_point:list,printDeets:bool = False):
     dwg = ezdxf.new()
     msp = dwg.modelspace()
     stl_model = align_mesh_to_cutting_plane(mesh,np.array(slicing_plane_normal),np.array(slicing_plane_point),printDeets)
-    translatedModel = 
     n=0
     for triangle in stl_model.vectors:
         out = SliceTriangleAtPlane(np.array([0,0,1]),np.array([0,0,0]),triangle,printDeets)
@@ -102,6 +101,29 @@ def slice_stl_to_dwg(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_poin
             for i in range(len(out)):
                 zPlane.append(out[i][-1])
                 out[i] = out[i][:-1]
+            out = rmSame(out)
+            if len(out) != 1:
+                if len(out) == 2:
+                    out.append(out[0])
+                    out.append(out[1])
+                elif len(out) == 3:
+                    out.append(out[0])
+                msp.add_lwpolyline(out)
+
+                printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}","slice_stl_to_dwg")
+            
+    return dwg
+
+def slice_stl_to_dwg(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_point:list,printDeets:bool = False):
+    dwg = ezdxf.new()
+    msp = dwg.modelspace()
+    n=0
+    for triangle in mesh.vectors:
+        out = SliceTriangleAtPlane(np.array(slicing_plane_normal),np.array(slicing_plane_point),triangle,printDeets)
+        if out != None:
+            n+=1
+            for i in range(len(out)):
+                out[i] = out[i]
             out = rmSame(out)
             if len(out) != 1:
                 if len(out) == 2:

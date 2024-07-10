@@ -564,4 +564,3 @@ def printIF(boolean:bool,printString:str,precursor:str = "sys"):
     if boolean:
         print_styled(precursor+":",33,"1",end=" ")
         print(printString)
-

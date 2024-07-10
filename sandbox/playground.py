@@ -6,6 +6,6 @@ path = "data/stl/cube.stl"
 dh.clear_output_paths()
 dh.startreadingterminal()
 
-dh.DEVwidth_slice_stl(path,dh.slices_output_dir,1,[0,0,1],printDeets=True)
+dh.view_stl_dev(path,dh.image_output_dir)
 
 dh.stopreadingterminal()
