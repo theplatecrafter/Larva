@@ -2,22 +2,31 @@ import Larva.data_handler as dh
 from Larva.tools import *
 
 def slice_stl_file_to_dwg(stl_mesh:m.Mesh,planeNormal:np.ndarray,planePoint:np.ndarray):
-    triDATA = []
-    outTRI = []
-    for triangle in stl_mesh.vectors:
-        triDATA.append(SliceTriangleAtPlane(planeNormal,planePoint,triangle))
-    triDATA = [i for i in triDATA if len(i) == 2]
-    baseSegment = triDATA[0]
-    baseLength = np.linalg.norm(baseSegment[1]-baseSegment[0])
-    outTRI.append([np.array([0,0,0]),np.array([baseLength,0,0])])
+    rotateX(stl_mesh,np.array([0,0,0]),math.pi/2)
+
 
 def rotateX(stl_mesh:m.Mesh,pivot:np.ndarray,angle:float):
-    new_triangles = []
-    for triangle in stl_mesh.vectors:
-        new_triangle = []
-        new_triangle.append(triangle[0]*math.cos(angle)+(np.cross(pivot,triangle[0])*math.sin(angle)+pivot))
+    for i in range(len(stl_mesh.vectors)):
+        print(stl_mesh.vectors[i])
+        for j in range(len(stl_mesh.vectors[i])):
+            stl_mesh.vectors[i][j] = rotate_point(stl_mesh.vectors[i][j],pivot,np.array([1,0,0]),angle)
+        print(stl_mesh.vectors[i])
 
-def rotate_point(point, pivot, axis, theta):
+def rotateY(stl_mesh:m.Mesh,pivot:np.ndarray,angle:float):
+    for i in range(len(stl_mesh.vectors)):
+        print(stl_mesh.vectors[i])
+        for j in range(len(stl_mesh.vectors[i])):
+            stl_mesh.vectors[i][j] = rotate_point(stl_mesh.vectors[i][j],pivot,np.array([0,1,0]),angle)
+        print(stl_mesh.vectors[i])
+        
+def rotateZ(stl_mesh:m.Mesh,pivot:np.ndarray,angle:float):
+    for i in range(len(stl_mesh.vectors)):
+        print(stl_mesh.vectors[i])
+        for j in range(len(stl_mesh.vectors[i])):
+            stl_mesh.vectors[i][j] = rotate_point(stl_mesh.vectors[i][j],pivot,np.array([0,0,1]),angle)
+        print(stl_mesh.vectors[i])
+
+def rotate_point(point:np.ndarray, pivot:np.ndarray, axis:np.ndarray, theta:float):
     """
     Rotate a point around a pivot by theta degrees along the given axis.
 
@@ -30,13 +39,6 @@ def rotate_point(point, pivot, axis, theta):
     Returns:
     - (x_new, y_new, z_new): coordinates of the rotated point.
     """
-    # Convert degrees to radians
-    theta = np.radians(theta)
-
-    # Convert to numpy arrays
-    point = np.array(point)
-    pivot = np.array(pivot)
-    axis = np.array(axis)
 
     # Translate point to origin
     point -= pivot
