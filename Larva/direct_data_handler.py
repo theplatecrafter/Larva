@@ -90,7 +90,7 @@ def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_fil
     body_image_path = os.path.join(output_path,"body_images")
     os.mkdir(body_path)
     os.mkdir(body_image_path)
-    out = view_stl_dev(path_to_stl,output_path,"stl.png",None,True,True)
+    out = DEVview_stl(path_to_stl,output_path,"stl.png",None,True,True)
     bounding_box = out[1]["bounding_box"]
 
     triangles_path = os.path.join(output_path,"triangles")
@@ -106,7 +106,7 @@ def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_fil
         triangles[1].append(str(target_stl.vectors[0][0]))
         triangles[2].append(str(target_stl.vectors[0][1]))
         triangles[3].append(str(target_stl.vectors[0][2]))
-        view_stl_dev(file_path,triangles_image_path,f"triangle{i+1}.png",bounding_box,False,True)
+        DEVview_stl(file_path,triangles_image_path,f"triangle{i+1}.png",bounding_box,False,True)
         printIF(printDeets,f"{i+1}/{len(files)} triangles loaded","get_stl_info")
 
     png_to_mp4(triangles_image_path,output_path,"triangles")

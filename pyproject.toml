@@ -24,6 +24,7 @@ glfw = "^2.7.0"
 glm = "^0.4.4"
 mayavi = "^4.8.2"
 scipy = "^1.13.1"
+trimesh = "^4.4.7"
 
 [tool.poetry.dev-dependencies]
 ipykernel = "^6.29.4"

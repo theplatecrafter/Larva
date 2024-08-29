@@ -229,7 +229,7 @@ def find_signed_min_max_distances(points, plane_normal):
     return min_point, min_distance, max_point, max_distance
 
 ## view
-def view_stl_dev(stl_path: str, output_dir: str, output_name: str = "stl_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave:bool = False):
+def DEVview_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave:bool = False):
     target_stl = m.Mesh.from_file(stl_path)
 
     if start_end_points:
@@ -366,84 +366,79 @@ def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", 
     plt.show()
 
 def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave: bool = False, resolution: tuple = (1600, 1200)):
-    dwg = ezdxf.readfile(dwg_path)
-    msp = dwg.modelspace()
-    entities = list(msp)
+    """
+    Render a DWG file to an image file.
+
+    :param dwg_path: Path to the input DWG file
+    :param output_dir: Directory to save the output image
+    :param output_name: Name of the output image file
+    :param start_end_points: Optional tuple of start and end points to highlight
+    :param return_info: If True, returns the information about the entities in the DWG file
+    :param onlySave: If True, only saves the image without showing it
+    :param resolution: Resolution of the output image
+    """
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
     
-    start_x = end_x = start_y = end_y = None
-    # Iterate over all entities to find the bounding box
-    if start_end_points:
-        start_x, start_y = start_end_points[0]
-        end_x, end_y = start_end_points[1]
-    else:
-        for entity in entities:
-            if entity.dxftype() == 'LINE':
-                start_x = min(start_x, entity.dxf.start[0]) if start_x is not None else entity.dxf.start[0]
-                end_x = max(end_x, entity.dxf.end[0]) if end_x is not None else entity.dxf.end[0]
-                start_y = min(start_y, entity.dxf.start[1]) if start_y is not None else entity.dxf.start[1]
-                end_y = max(end_y, entity.dxf.end[1]) if end_y is not None else entity.dxf.end[1]
-            else:
-                # Get all vertices of the entity
-                vertices = entity.vertices()
-                if vertices:
-                    x_vals, y_vals = zip(*[(vertex[0], vertex[1]) for vertex in vertices])
-                    start_x = min(start_x, min(x_vals)) if start_x is not None else min(x_vals)
-                    end_x = max(end_x, max(x_vals)) if end_x is not None else max(x_vals)
-                    start_y = min(start_y, min(y_vals)) if start_y is not None else min(y_vals)
-                    end_y = max(end_y, max(y_vals)) if end_y is not None else max(y_vals)
-        
-        start_x -= (end_x - start_x) / 15
-        end_x += (end_x - start_x) / 15
-        start_y -= (end_y - start_y) / 15
-        end_y += (end_y - start_y) / 15
-
-    # Calculate figure size in inches based on the resolution and a DPI of 100
-    fig_width = resolution[0] / 100
-    fig_height = resolution[1] / 100
-
-    fig = plt.figure(figsize=(fig_width, fig_height), dpi=100)
-    ax = fig.add_subplot(111)
-
-    # Generate a colormap
-    num_entities = len(entities)
-    colors = hsv_to_rgb(np.linspace(0, 1, num_entities).reshape(-1, 1) * np.ones((1, 3)))
-
-    for idx, entity in enumerate(entities):
-        color = colors[idx]
+    # Read the DWG file
+    doc = ezdxf.readfile(dwg_path)
+    msp = doc.modelspace()
+    
+    # Prepare plot
+    fig, ax = plt.subplots(figsize=(resolution[0] / 100, resolution[1] / 100), dpi=100)
+    ax.set_aspect('equal')
+    
+    # Plot entities
+    for entity in msp:
         if entity.dxftype() == 'LINE':
-            start_point = (entity.dxf.start[0], entity.dxf.start[1])
-            end_point = (entity.dxf.end[0], entity.dxf.end[1])
-            ax.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color=color)
-        elif entity.dxftype() == 'LWPOLYLINE':
-            points = entity.get_points()
-            x = [point[0] for point in points]  # Extract x-coordinates
-            y = [point[1] for point in points]  # Extract y-coordinates
-            ax.plot(x, y, color=color)
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    file_name, file_dot = os.path.splitext(output_name)
-    ax.set_title(file_name)
-
-    # Set plot display area based on start and end points
-    if start_x is not None and end_x is not None and start_y is not None and end_y is not None:
-        ax.set_xlim(start_x, end_x)
-        ax.set_ylim(start_y, end_y)
-
+            start = entity.dxf.start
+            end = entity.dxf.end
+            ax.plot([start[0], end[0]], [start[1], end[1]], color='blue', lw=1)
+        elif entity.dxftype() == 'ARC':
+            center = entity.dxf.center
+            radius = entity.dxf.radius
+            start_angle = entity.dxf.start_angle
+            end_angle = entity.dxf.end_angle
+            arc = plt.Arc(center, 2*radius, 2*radius, theta1=start_angle, theta2=end_angle, color='red', lw=1)
+            ax.add_patch(arc)
+    
+    # Highlight start and end points if provided
+    if start_end_points:
+        start_point, end_point = start_end_points
+        ax.plot(start_point[0], start_point[1], 'go')  # Start point
+        ax.plot(end_point[0], end_point[1], 'ro')    # End point
+    
+    # Set axis limits
+    ax.autoscale_view()
+    
+    # Save image
+    image_path = os.path.join(output_dir, output_name)
+    plt.savefig(image_path, bbox_inches='tight', pad_inches=0)
+    
+    # Optionally show image
     if not onlySave:
         plt.show()
-    plt.savefig(os.path.join(output_dir, output_name))
     
+    # Return information if requested
     if return_info:
-        info = {
-            'bounding_box': ((start_x, start_y), (end_x, end_y)),
-            'num_entities': len(entities),
-            'format': dwg.dxfversion,
-            'filename': os.path.splitext(os.path.basename(dwg_path))[0]
-        }
-        return plt, info
-    else:
-        return plt
+        info = {"lines": [], "arcs": []}
+        for entity in msp:
+            if entity.dxftype() == 'LINE':
+                info["lines"].append({
+                    "start": entity.dxf.start,
+                    "end": entity.dxf.end
+                })
+            elif entity.dxftype() == 'ARC':
+                info["arcs"].append({
+                    "center": entity.dxf.center,
+                    "radius": entity.dxf.radius,
+                    "start_angle": entity.dxf.start_angle,
+                    "end_angle": entity.dxf.end_angle
+                })
+        return info
+    
+    print(f"DWG view saved as {image_path}")
+
 
 ## plane combine
 def get_entity_extents(entity,printDeets=False):
