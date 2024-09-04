@@ -22,10 +22,13 @@ class TerminalOutputWatcher:
             self.is_watching = False
 
 # Usage example
-watcher = TerminalOutputWatcher("terminal_output.txt")
+watcher = TerminalOutputWatcher("terminal_output.ansi")
 
 def startreadingterminal():
     watcher.start_watching()
 
 def stopreadingterminal():
     watcher.stop_watching()
+    
+
+## must have "ANSI colors" installed Name: ANSI Colors https://marketplace.visualstudio.com/items?itemName=iliazeus.vscode-ansi

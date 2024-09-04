@@ -1,21 +1,19 @@
 import numpy as np
 from stl import mesh as m
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import math
 import os
+import trimesh as tri
+
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from skimage.measure import label
 import ezdxf
-import subprocess
-from shapely.geometry import Polygon, MultiPolygon
-from itertools import combinations
 import shutil
 from moviepy.editor import ImageSequenceClip
-import math
 import xlsxwriter as xlsw
 from matplotlib.colors import hsv_to_rgb
 from scipy.spatial.transform import Rotation as R
-from ezdxf.math import BoundingBox, Vec3
 
 
 from .read_terminal import *

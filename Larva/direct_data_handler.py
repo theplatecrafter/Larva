@@ -159,3 +159,15 @@ def DEVwidth_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlane
             printIF(printDeets,f"loaded image for slice{i+1}","DEVwidth_slice_stl")
         else:
             out[i].saveas(os.path.join(path,f"slice{i+1}.dwg"))
+
+def stl_to_gltf(stl_path: str, outputpath: str, outputname: str = "out",printDeets:bool = True):
+    mesh = tri.load_mesh(stl_path)
+    
+    if not mesh.is_volume:
+        raise ValueError("The mesh is not a valid volume.")
+
+    gltf_path = f"{outputpath}/{outputname}.gltf"
+    
+    mesh.export(gltf_path)
+    
+    printIF(printDeets,f"STL file '{stl_path}' has been successfully converted to GLTF '{gltf_path}'","stl_to_gltf")
