@@ -2,7 +2,7 @@ import numpy as np
 from stl import mesh as m
 import math
 import os
-import trimesh as tri
+import trimesh
 
 
 import matplotlib.pyplot as plt
