@@ -83,44 +83,6 @@ def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_fil
     printIF(printDeets,"created info file","get_dwg_info")
     printIF(printDeets,"done!","get_dwg_info")
 
-def get_stl_info(path_to_stl:str,output_path:str,outputfoldername:str = "stl_file_infos",printDeets:bool = True):
-    output_path = os.path.join(output_path,outputfoldername)
-    os.mkdir(output_path)
-    body_path = os.path.join(output_path,"bodies")
-    body_image_path = os.path.join(output_path,"body_images")
-    os.mkdir(body_path)
-    os.mkdir(body_image_path)
-    out = DEVview_stl(path_to_stl,output_path,"stl.png",None,True,True)
-    bounding_box = out[1]["bounding_box"]
-
-    triangles_path = os.path.join(output_path,"triangles")
-    triangles_image_path = os.path.join(output_path,"triangle_images")
-    os.mkdir(triangles_image_path)
-
-    return_stl_parts(path_to_stl,output_path,"triangles",printDeets)
-    files = [i for i in os.listdir(triangles_path) if i.lower().endswith(".stl")]
-    triangles= [[i+1 for i in range(len(files))],[],[],[]]
-    for i in range(len(files)):
-        file_path = os.path.join(triangles_path,files[i])
-        target_stl = m.Mesh.from_file(file_path)
-        triangles[1].append(str(target_stl.vectors[0][0]))
-        triangles[2].append(str(target_stl.vectors[0][1]))
-        triangles[3].append(str(target_stl.vectors[0][2]))
-        DEVview_stl(file_path,triangles_image_path,f"triangle{i+1}.png",bounding_box,False,True)
-        printIF(printDeets,f"{i+1}/{len(files)} triangles loaded","get_stl_info")
-
-    png_to_mp4(triangles_image_path,output_path,"triangles")
-
-    createSimpleXLSX(["#","p1","p2","p3"],triangles,output_path,"info")
-
-    DEVreturn_stl_bodies(path_to_stl,output_path,"bodies",printDeets)
-    files = [i for i in os.listdir(body_path) if i.lower().endswith(".stl")]
-    for i in range(len(files)):
-        file_path = os.path.join(body_path,files[i])
-        view_stl(file_path,body_image_path,f"Body_{i}.png",bounding_box,False,True)
-        printIF(printDeets,f"Created image for body {i+1}/{len(files)}","get_stl_info")
-    png_to_mp4(body_image_path,output_path,"bodies")
-
 def DEVreturn_dwg_parts(path_to_dwg: str, outputdir: str, foldername: str = "dwgparts",printDeets:bool = True):
     out = os.path.join(outputdir,foldername)
     os.mkdir(out)
@@ -128,25 +90,11 @@ def DEVreturn_dwg_parts(path_to_dwg: str, outputdir: str, foldername: str = "dwg
     for i in range(len(data)):
         data[i].saveas(os.path.join(out,f"part{i+1}.dwg"))
     
-def DEVreturn_stl_parts(path_to_stl: str, outputdir: str, foldername: str = "stlparts",printDeets:bool = True):
-    out = os.path.join(outputdir,foldername)
-    os.mkdir(out)
-    data = return_dwg_parts(m.Mesh.from_file(path_to_stl),printDeets)
-    for i in range(len(data)):
-        data[i].save(out,f"part{i+1}.stl")
-
-def DEVreturn_stl_bodies(path_to_stl: str, outputdir: str, foldername: str = "stlbodies",printDeets:bool = True):
-    out = os.path.join(outputdir,foldername)
-    os.mkdir(out)
-    data = return_stl_bodies(m.Mesh.from_file(path_to_stl),printDeets)
-    for i in range(len(data)):
-        data[i].save(out,f"body{i+1}.stl")
-
-def DEVslice_stl_to_dwg(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_name: str = "sliced",printDeets:bool = True):
-    slice_stl_to_dwg(m.Mesh.from_file(stl_path),slicing_plane_normal,slicing_plane_point,printDeets).saveas(os.path.join(output_dir,output_name+".dwg"))
+def DEVslice_stl(stl_path: str, slicing_plane_normal: list, slicing_plane_point:list, output_dir: str, output_name: str = "sliced",printDeets:bool = True):
+    slice_stl(trimesh.load_mesh(stl_path),slicing_plane_normal,slicing_plane_point,printDeets).saveas(os.path.join(output_dir,output_name+".dwg"))
 
 def DEVwidth_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlaneNormal:list = [0,0,1],outputFolderName:str = "stl_slices",printDeets:bool = False,withExtra:bool = True):
-    out = width_slice_stl(m.Mesh.from_file(stl_path),sliceWidth,slicePlaneNormal,printDeets)
+    out = width_slice_stl(trimesh.load_mesh(stl_path),sliceWidth,slicePlaneNormal,printDeets)
     path = os.path.join(outputFolder,outputFolderName)
     os.mkdir(path)
     if withExtra:
@@ -155,19 +103,219 @@ def DEVwidth_slice_stl(stl_path:str,outputFolder:str,sliceWidth:float,slicePlane
     for i in range(len(out)):
         if withExtra:
             out[i].saveas(os.path.join(path,os.path.join("data",f"slice{i+1}.dwg")))
-            view_dwg(os.path.join(path,os.path.join("data",f"slice{i+1}.dwg")),os.path.join(path,"image"),f"slice{i+1}.png")
+            view_dwg(os.path.join(path,os.path.join("data",f"slice{i+1}.dwg")),os.path.join(path,"image"),f"slice{i+1}.png",onlySave=True)
             printIF(printDeets,f"loaded image for slice{i+1}","DEVwidth_slice_stl")
         else:
             out[i].saveas(os.path.join(path,f"slice{i+1}.dwg"))
 
-def stl_to_gltf(stl_path: str, outputpath: str, outputname: str = "out",printDeets:bool = True):
-    mesh = tri.load_mesh(stl_path)
-    
-    if not mesh.is_volume:
-        raise ValueError("The mesh is not a valid volume.")
+## view
+def DEVview_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave:bool = False):
+    target_stl = m.Mesh.from_file(stl_path)
 
-    gltf_path = f"{outputpath}/{outputname}.gltf"
+    if start_end_points:
+        xlim = [start_end_points[0][0],start_end_points[0][1]]
+        ylim = [start_end_points[1][0],start_end_points[1][1]]
+        zlim = [start_end_points[2][0],start_end_points[2][1]]
+    else:
+        min_x, max_x = np.min(target_stl.vectors[:, :, 0]), np.max(target_stl.vectors[:, :, 0])
+        min_y, max_y = np.min(target_stl.vectors[:, :, 1]), np.max(target_stl.vectors[:, :, 1])
+        min_z, max_z = np.min(target_stl.vectors[:, :, 2]), np.max(target_stl.vectors[:, :, 2])
+
+        length_x = max_x - min_x
+        length_y = max_y - min_y
+        length_z = max_z - min_z
+
+        largest_length = max(length_x, length_y, length_z)
+
+        margin = largest_length * 0.1
+
+        xlim = [(min_x + max_x - largest_length) / 2 - margin, (min_x + max_x + largest_length) / 2 + margin]
+        ylim = [(min_y + max_y - largest_length) / 2 - margin, (min_y + max_y + largest_length) / 2 + margin]
+        zlim = [(min_z + max_z - largest_length) / 2 - margin, (min_z + max_z + largest_length) / 2 + margin]
+
+    x = 1600
+    y = 1200
+    fig = plt.figure(figsize=(x/100, y/100), dpi=100)
+
+    ax = fig.add_subplot(111, projection='3d')
+
+    polygons = []
+    for i in range(len(target_stl.vectors)):
+        tri = target_stl.vectors[i]
+        polygons.append(tri)
+
+    # Generate a colormap with unique colors
+    cmap = plt.get_cmap('tab20', len(polygons))
+    colors = [cmap(i) for i in range(len(polygons))]
+
+    poly_collection = Poly3DCollection(polygons, linewidths=1, edgecolors='k')
+
+    # Assign a different color to each triangle
+    poly_collection.set_facecolors(colors)
+
+    ax.add_collection3d(poly_collection)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(os.path.splitext(output_name)[0])
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_zlim(zlim)
+
+    if not onlySave:
+        plt.show()
+    plt.savefig(f"{output_dir}/{output_name}")
+
+    if return_info:
+        info = {
+            'bounding_box': ((xlim[0], xlim[1]), (ylim[0], ylim[1]), (zlim[0], zlim[1])),
+            'num_entities': len(target_stl.vectors),
+            'filename': os.path.splitext(os.path.basename(stl_path))[0]
+        }
+        return plt
+    return plt
+
+def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", color_triangles: bool = True, keep_aspect_ratio: bool = True, rotation_angles: tuple = None, resolution: tuple = (1600, 1200), margin: float = 0.1):
+    # Load the STL file
+    your_mesh = m.Mesh.from_file(stl_path)
     
-    mesh.export(gltf_path)
+    # Extract vertices and faces
+    vertices = your_mesh.vectors.reshape(-1, 3)
+    faces = your_mesh.vectors
     
-    printIF(printDeets,f"STL file '{stl_path}' has been successfully converted to GLTF '{gltf_path}'","stl_to_gltf")
+    # Rotate the vertices if rotation_angles are provided
+    if rotation_angles is not None:
+        vertices = rotate(vertices, rotation_angles)
+        faces = vertices.reshape(-1, 3, 3)
+    
+    # Create a new plot
+    fig = plt.figure(figsize=(resolution[0] / 100, resolution[1] / 100), dpi=100)
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Optionally color each triangle differently
+    if color_triangles:
+        face_colors = plt.cm.viridis(np.linspace(0, 1, len(faces)))
+    else:
+        face_colors = "blue"
+    
+    # Create a Poly3DCollection
+    collection = Poly3DCollection(faces, facecolors=face_colors, edgecolor='k')
+    ax.add_collection3d(collection)
+    
+    # Compute the range for each axis
+    x_min, x_max = np.min(vertices[:, 0]), np.max(vertices[:, 0])
+    y_min, y_max = np.min(vertices[:, 1]), np.max(vertices[:, 1])
+    z_min, z_max = np.min(vertices[:, 2]), np.max(vertices[:, 2])
+    
+    # Compute the margins
+    x_margin = (x_max - x_min) * margin
+    y_margin = (y_max - y_min) * margin
+    z_margin = (z_max - z_min) * margin
+    
+    # Adjust aspect ratio if required
+    if keep_aspect_ratio:
+        # Find the largest dimension to scale equally
+        max_range = max(x_max - x_min, y_max - y_min, z_max - z_min)
+        
+        # Calculate midpoints
+        mid_x = (x_max + x_min) / 2
+        mid_y = (y_max + y_min) / 2
+        mid_z = (z_max + z_min) / 2
+
+        # Set the limits to keep aspect ratio with margins
+        ax.set_xlim(mid_x - max_range / 2 - x_margin, mid_x + max_range / 2 + x_margin)
+        ax.set_ylim(mid_y - max_range / 2 - y_margin, mid_y + max_range / 2 + y_margin)
+        ax.set_zlim(mid_z - max_range / 2 - z_margin, mid_z + max_range / 2 + z_margin)
+    else:
+        ax.set_xlim(x_min - x_margin, x_max + x_margin)
+        ax.set_ylim(y_min - y_margin, y_max + y_margin)
+        ax.set_zlim(z_min - z_margin, z_max + z_margin)
+    
+    # Automatically adjust camera angles if rotation_angles are not provided
+    if rotation_angles is None:
+        ax.view_init(elev=90, azim=-90)
+    else:
+        ax.view_init(elev=20, azim=30)
+    
+    # Save the plot
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    plt.savefig(os.path.join(output_dir, output_name))
+    plt.show()
+
+def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave: bool = False, resolution: tuple = (1600, 1200)):
+    """
+    Render a DWG file to an image file.
+
+    :param dwg_path: Path to the input DWG file
+    :param output_dir: Directory to save the output image
+    :param output_name: Name of the output image file
+    :param start_end_points: Optional tuple of start and end points to highlight
+    :param return_info: If True, returns the information about the entities in the DWG file
+    :param onlySave: If True, only saves the image without showing it
+    :param resolution: Resolution of the output image
+    """
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Read the DWG file
+    doc = ezdxf.readfile(dwg_path)
+    msp = doc.modelspace()
+    
+    # Prepare plot
+    fig, ax = plt.subplots(figsize=(resolution[0] / 100, resolution[1] / 100), dpi=100)
+    ax.set_aspect('equal')
+    
+    # Plot entities
+    for entity in msp:
+        if entity.dxftype() == 'LINE':
+            print(type(entity))
+            start = entity.dxf.start
+            end = entity.dxf.end
+            ax.plot([start[0], end[0]], [start[1], end[1]], color='blue', lw=1)
+        elif entity.dxftype() == 'ARC':
+            center = entity.dxf.center
+            radius = entity.dxf.radius
+            start_angle = entity.dxf.start_angle
+            end_angle = entity.dxf.end_angle
+            arc = plt.Arc(center, 2*radius, 2*radius, theta1=start_angle, theta2=end_angle, color='red', lw=1)
+            ax.add_patch(arc)
+    
+    # Highlight start and end points if provided
+    if start_end_points:
+        start_point, end_point = start_end_points
+        ax.plot(start_point[0], start_point[1], 'go')  # Start point
+        ax.plot(end_point[0], end_point[1], 'ro')    # End point
+    
+    # Set axis limits
+    ax.autoscale_view()
+    
+    # Save image
+    image_path = os.path.join(output_dir, output_name)
+    plt.savefig(image_path, bbox_inches='tight', pad_inches=0)
+    
+    # Optionally show image
+    if not onlySave:
+        plt.show()
+    
+    # Return information if requested
+    if return_info:
+        info = {"lines": [], "arcs": []}
+        for entity in msp:
+            if entity.dxftype() == 'LINE':
+                info["lines"].append({
+                    "start": entity.dxf.start,
+                    "end": entity.dxf.end
+                })
+            elif entity.dxftype() == 'ARC':
+                info["arcs"].append({
+                    "center": entity.dxf.center,
+                    "radius": entity.dxf.radius,
+                    "start_angle": entity.dxf.start_angle,
+                    "end_angle": entity.dxf.end_angle
+                })
+        return info
+    
+    print(f"DWG view saved as {image_path}")

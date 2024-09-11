@@ -1,3 +1,7 @@
+import ezdxf.document
+import ezdxf.document
+import ezdxf.document
+import ezdxf.entities
 from .tools import *
 
 
@@ -47,107 +51,46 @@ def return_dwg_parts(doc,printDeets:bool = False):
     
     return docs
 
-def return_stl_parts(original_mesh:m.Mesh,printDeets:bool = False):
-    num_triangles = len(original_mesh)
-    meshes = []
-    for i, triangle in enumerate(original_mesh.vectors):
-        printIF(printDeets,f"{i+1}/{num_triangles} triangles processed","return_stl_parts")
-
-        # Create a new mesh with a single triangle
-        new_mesh = m.Mesh(np.zeros(1, dtype=m.Mesh.dtype))
-        new_mesh.vectors[0] = triangle.reshape((3, 3))
-
-        # Save the new mesh as an STL file
-        meshes.append(new_mesh)
+def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list ,printDeets:bool = True):
+    """
+    Slice a 3D STL file at a specified height and export the result to a DXF file.
     
-    return meshes
+    :param input_file: Path to the input 3D STL file
+    :param output_dir: Path to the dir to save the dxf file
+    :param slice_height: Height at which to slice the object
+    """
 
-def return_stl_bodies(stl_mesh:m.Mesh,printDeets:bool = False):
-    vertices = stl_mesh.vectors.reshape((-1, 3))
-    result = label(stl_mesh.vectors[:, :, 0])
+    slice_3d = input_trimesh.section(plane_origin = slice_origin,plane_normal = slice_normal)
+    if slice_3d is None or len(slice_3d.entities) == 0:
+        printIF(printDeets,f"No intersection at {slice_normal}, {slice_origin}","slice_3d_stl")
+        return
+    
+    doc = ezdxf.new()
+    msp = doc.modelspace()
 
-    if isinstance(result, tuple):
-        labeled_array, num_labels = result
-    else:
-        labeled_array = result
-        num_labels = np.max(labeled_array)
+    slice_2d = slice_3d.to_planar()[0]
+    slice_2d.simplify()
+    
+    
+    for entity in slice_2d.entities:
+        for decomposed in entity.explode():
+            line = decomposed.bounds(slice_2d.vertices)
+            msp.add_lwpolyline((line[0],line[1]),)
+            printIF(printDeets,f"{decomposed} has line data: {decomposed.bounds(slice_2d.vertices)}","slice_3d_stl")
 
-    labeled_array = labeled_array.reshape((-1,))
+    return doc
 
-    n = 0
-    bodies = []
-    for label_idx in range(1, num_labels + 1):
-        n+= 1
-        label_vertices = vertices[labeled_array == label_idx]
-        body_mesh = m.Mesh(
-            np.zeros(label_vertices.shape[0], dtype=m.Mesh.dtype))
-        for i, vertex in enumerate(label_vertices):
-            body_mesh.vectors[i] = vertex
-        bodies.append(body_mesh)
-        printIF(printDeets,f"{n}/{num_labels} bodies loaded","return_stl_bodies")
-
-    return bodies
-
-def slice_stl_to_dwgB(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_point:list,printDeets:bool = False):
-    dwg = ezdxf.new()
-    msp = dwg.modelspace()
-    stl_model = align_mesh_to_cutting_plane(mesh,np.array(slicing_plane_normal),np.array(slicing_plane_point),printDeets)
-    n=0
-    for triangle in stl_model.vectors:
-        out = SliceTriangleAtPlane(np.array([0,0,1]),np.array([0,0,0]),triangle,printDeets)
-        if out != None:
-            n+=1
-            zPlane = []
-            for i in range(len(out)):
-                zPlane.append(out[i][-1])
-                out[i] = out[i][:-1]
-            out = rmSame(out)
-            if len(out) != 1:
-                if len(out) == 2:
-                    out.append(out[0])
-                    out.append(out[1])
-                elif len(out) == 3:
-                    out.append(out[0])
-                msp.add_lwpolyline(out)
-
-                printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}","slice_stl_to_dwg")
-            
-    return dwg
-
-def slice_stl_to_dwg(mesh:m.Mesh, slicing_plane_normal: list, slicing_plane_point:list,printDeets:bool = False):
-    dwg = ezdxf.new()
-    msp = dwg.modelspace()
-    n=0
-    for triangle in mesh.vectors:
-        out = SliceTriangleAtPlane(np.array(slicing_plane_normal),np.array(slicing_plane_point),triangle,printDeets)
-        if out != None:
-            n+=1
-            for i in range(len(out)):
-                out[i] = out[i]
-            out = rmSame(out)
-            if len(out) != 1:
-                if len(out) == 2:
-                    out.append(out[0])
-                    out.append(out[1])
-                elif len(out) == 3:
-                    out.append(out[0])
-                msp.add_lwpolyline(out)
-
-                printIF(printDeets,f"{n}: Created LWPOLYLINE : {out}\ntriangle:{triangle}","slice_stl_to_dwg")
-            
-    return dwg
-
-def width_slice_stl(stl_model:m.Mesh,sliceWidth:float,slicePlaneNormal:list = [0,0,1],printDeets:bool = False):
+def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNormal:list = [0,0,1],printDeets:bool = False):
     docList = []
-    points = np.unique(stl_model.vectors.reshape([-1, 3]), axis=0)
+    points = np.unique(input_trimesh.vertices.reshape([-1, 3]), axis=0)
     slicePlaneNormal = np.array(slicePlaneNormal)
     out = find_signed_min_max_distances(points,slicePlaneNormal)
     minPoint = out[0]
     maxPoint = out[2]
-    sliceNumbers = math.ceil(np.linalg.norm(maxPoint-minPoint)/sliceWidth)-1
-    slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i for i in range(sliceNumbers)]
+    sliceNumbers = math.ceil(np.linalg.norm(maxPoint-minPoint)/sliceWidth)
+    slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i*sliceWidth for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
-        doc = removeUnneededlines(slice_stl_to_dwg(stl_model,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets),0,printDeets)
+        doc = slice_stl(input_trimesh,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets)
         docList.append(doc)
         printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: sliced mesh with plane point: {slicePlanePoints[i]}","width_slice_stl")
 
@@ -201,3 +144,91 @@ def pack_dwg_files_no_overlap(docs,printDeets:bool = False):
         printIF(printDeets,f"{n}/{len(docs)} inserted dwg at {translation}","pack_dwg_files_no_overlap")
     
     return combined_doc
+
+def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,printDeets:bool = True):
+    docX = width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)
+    docY = width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)
+    docZ = width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)
+    
+    print(simplify_ezdxf_doc(docX[0]))
+
+def dwg_components(doc:ezdxf.document.Drawing):
+    msp = doc.modelspace()
+
+    G = nx.Graph()
+
+    def add_edge(p1, p2):
+        G.add_edge(tuple(p1), tuple(p2))
+        print(f"added {p1}, {p2}")
+
+    for entity in msp:
+        if entity.dxftype() == 'LINE':
+            add_edge(entity.dxf.start, entity.dxf.end)
+        elif entity.dxftype() == 'CIRCLE':
+            center = entity.dxf.center
+            radius = entity.dxf.radius
+            for i in range(8):
+                angle = i * 45
+                point = Vec2.from_deg_angle(angle) * radius + Vec2(center)
+                add_edge(center, point)
+        elif entity.dxftype() == 'ARC':
+            center = entity.dxf.center
+            radius = entity.dxf.radius
+            start_angle = entity.dxf.start_angle
+            end_angle = entity.dxf.end_angle
+            for angle in range(int(start_angle), int(end_angle) + 45, 45):
+                point = Vec2.from_deg_angle(angle) * radius + Vec2(center)
+                add_edge(center, point)
+
+    num_components = nx.number_connected_components(G)
+
+    return num_components
+
+def simplify_ezdxf_doc(doc:ezdxf.document.Drawing):
+    msp = doc.modelspace()
+    
+    def points_are_close(p1, p2, tolerance=1e-6):
+        return Vec2(p1).distance(Vec2(p2)) < tolerance
+
+    def lines_are_collinear(line1, line2, tolerance=1e-6):
+        vec1 = Vec2(line1.dxf.end) - Vec2(line1.dxf.start)
+        vec2 = Vec2(line2.dxf.end) - Vec2(line2.dxf.start)
+        return abs(vec1.angle_between(vec2)) < tolerance or abs(vec1.angle_between(vec2) - math.pi) < tolerance
+    def merge_collinear_lines(line1, line2):
+        points = [Vec2(line1.dxf.start), Vec2(line1.dxf.end), Vec2(line2.dxf.start), Vec2(line2.dxf.end)]
+        min_point = min(points, key=lambda p: (p.x, p.y))
+        max_point = max(points, key=lambda p: (p.x, p.y))
+        return min_point, max_point
+
+    lines = [e for e in msp if e.dxftype() == "LINE"]
+
+    lines.sort(key=lambda l: (l.dxf.start[0], l.dxf.start[1]))
+
+    simplified_lines = []
+    i = 0
+    while i < len(lines):
+        current_line = lines[i]
+        merged = False
+        j = i + 1
+        while j < len(lines):
+            next_line = lines[j]
+            if lines_are_collinear(current_line, next_line):
+                # Merge the lines
+                start, end = merge_collinear_lines(current_line, next_line)
+                current_line.dxf.start = start
+                current_line.dxf.end = end
+                merged = True
+                j += 1
+            else:
+                break
+        if not merged:
+            simplified_lines.append(current_line)
+        i = j
+
+    for line in lines:
+        msp.delete_entity(line)
+
+    for line in simplified_lines:
+        msp.add_line(line.dxf.start, line.dxf.end)
+
+    return doc
