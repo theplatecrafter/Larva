@@ -146,13 +146,63 @@ def pack_dwg_files_no_overlap(docs,printDeets:bool = False):
     return combined_doc
 
 def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,printDeets:bool = True):
-    docX = width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)
-    docY = width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)
-    docZ = width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)
+    docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
+    docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
+    docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
 
-    return simplify_ezdxf_doc(docX[7])
+    print(dwg_components(docX[0]))
 
+    return docX[0]
+
+def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
+    msp = doc.modelspace()
     
+    simpDOC = ezdxf.new()
+    simpMSP = simpDOC.modelspace()
+
+    def add_lwpolyline(line):
+        simpMSP.add_lwpolyline([list(line[0]) + list(line[0]), list(line[1]) + list(line[1])])
+
+    improved = True
+    while improved:
+        lines = [tuple(e.vertices()) for e in msp if e.dxftype() == "LWPOLYLINE"]
+        connectivityLINES = create_line_connectivity_map(lines)
+        processed_lines = set()
+        improved = False
+        
+        for line in lines:
+            if line in processed_lines:
+                continue
+
+            try:
+                connected_lines = [l for l in get_connected_lines(line, connectivityLINES) if l not in processed_lines]
+            except IndexError:
+                connected_lines = []
+
+            if connected_lines:
+                for connected_line in connected_lines:
+                    combined_line = combine_lines(line, connected_line, 0)
+                    if combined_line:
+                        add_lwpolyline(combined_line)
+                        processed_lines.add(line)
+                        processed_lines.add(connected_line)
+                        improved = True
+                        break
+                else:
+                    add_lwpolyline(line)
+                    processed_lines.add(line)
+            else:
+                add_lwpolyline(line)
+                processed_lines.add(line)
+
+        if improved:
+            msp = simpMSP
+            simpDOC = ezdxf.new()
+            simpMSP = simpDOC.modelspace()
+        else:
+            break
+
+    return simpDOC
 
 def dwg_components(doc:ezdxf.document.Drawing):
     msp = doc.modelspace()
@@ -185,45 +235,4 @@ def dwg_components(doc:ezdxf.document.Drawing):
     num_components = nx.number_connected_components(G)
 
     return num_components
-
-def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
-    msp = doc.modelspace()
-    
-    simpDOC = ezdxf.new()
-    simpMSP = simpDOC.modelspace()
-
-    def add_lwpolyline(line):
-        simpMSP.add_lwpolyline([list(line[0])+list(line[0]),list(line[1])+list(line[1])])
-
-    improved = True
-    while improved:
-        lines = [tuple(e.vertices()) for e in msp if e.dxftype() == "LWPOLYLINE"]
-        connectivityLINES = create_line_connectivity_map(lines)
-        processed_lines = []
-        improved = False
-        
-        for line in lines:
-            print(line)
-            try:
-                connected_line = [i for i in get_connected_lines(line,connectivityLINES) if i not in processed_lines][0]
-            except:
-                break
-            out = combine_lines(line,connected_line,0)
-            if out:
-                add_lwpolyline(out)
-                improved = True
-            else:
-                add_lwpolyline(line)
-                add_lwpolyline(connected_line)
-            processed_lines.append(connected_line)
-
-    
-        if improved:
-            msp = simpMSP
-            simpDOC = ezdxf.new()
-            simpMSP = simpDOC.modelspace()
-        
-        break
-
-    return simpDOC
         
