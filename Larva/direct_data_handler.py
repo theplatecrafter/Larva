@@ -271,17 +271,15 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
     # Plot entities
     for entity in msp:
         if entity.dxftype() == 'LINE':
-            print(type(entity))
             start = entity.dxf.start
             end = entity.dxf.end
             ax.plot([start[0], end[0]], [start[1], end[1]], color='blue', lw=1)
-        elif entity.dxftype() == 'ARC':
-            center = entity.dxf.center
-            radius = entity.dxf.radius
-            start_angle = entity.dxf.start_angle
-            end_angle = entity.dxf.end_angle
-            arc = plt.Arc(center, 2*radius, 2*radius, theta1=start_angle, theta2=end_angle, color='red', lw=1)
-            ax.add_patch(arc)
+        
+        elif entity.dxftype() == 'LWPOLYLINE':
+            points = list(entity.vertices())  # Get all vertices
+            points.append(points[0])  # Close the polyline if it's closed
+            x, y = zip(*points)  # Separate x and y coordinates
+            ax.plot(x, y, color='blue', lw=1)
     
     # Highlight start and end points if provided
     if start_end_points:
@@ -302,12 +300,16 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
     
     # Return information if requested
     if return_info:
-        info = {"lines": [], "arcs": []}
+        info = {"lines": [], "polylines": [], "arcs": []}
         for entity in msp:
             if entity.dxftype() == 'LINE':
                 info["lines"].append({
                     "start": entity.dxf.start,
                     "end": entity.dxf.end
+                })
+            elif entity.dxftype() == 'LWPOLYLINE':
+                info["polylines"].append({
+                    "points": list(entity.vertices())
                 })
             elif entity.dxftype() == 'ARC':
                 info["arcs"].append({
@@ -319,3 +321,10 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
         return info
     
     print(f"DWG view saved as {image_path}")
+
+
+
+def view_drawing(doc: ezdxf.document.Drawing, save_path: str = None):
+    doc.saveas(os.path.join(dwg_output_dir,"temp.dxf"))
+    view_dwg(os.path.join(dwg_output_dir,"temp.dxf"),image_output_dir,"temp.png")
+    

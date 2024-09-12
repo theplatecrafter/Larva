@@ -75,7 +75,7 @@ def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list
     for entity in slice_2d.entities:
         for decomposed in entity.explode():
             line = decomposed.bounds(slice_2d.vertices)
-            msp.add_lwpolyline((line[0],line[1]),)
+            msp.add_lwpolyline([list(line[0]) + list(line[0]),list(line[1]) + list(line[1])])
             printIF(printDeets,f"{decomposed} has line data: {decomposed.bounds(slice_2d.vertices)}","slice_3d_stl")
 
     return doc
@@ -149,8 +149,10 @@ def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float 
     docX = width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)
     docY = width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)
     docZ = width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)
+
+    return simplify_ezdxf_doc(docX[7])
+
     
-    print(simplify_ezdxf_doc(docX[0]))
 
 def dwg_components(doc:ezdxf.document.Drawing):
     msp = doc.modelspace()
@@ -184,51 +186,44 @@ def dwg_components(doc:ezdxf.document.Drawing):
 
     return num_components
 
-def simplify_ezdxf_doc(doc:ezdxf.document.Drawing):
+def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
     
-    def points_are_close(p1, p2, tolerance=1e-6):
-        return Vec2(p1).distance(Vec2(p2)) < tolerance
+    simpDOC = ezdxf.new()
+    simpMSP = simpDOC.modelspace()
 
-    def lines_are_collinear(line1, line2, tolerance=1e-6):
-        vec1 = Vec2(line1.dxf.end) - Vec2(line1.dxf.start)
-        vec2 = Vec2(line2.dxf.end) - Vec2(line2.dxf.start)
-        return abs(vec1.angle_between(vec2)) < tolerance or abs(vec1.angle_between(vec2) - math.pi) < tolerance
-    def merge_collinear_lines(line1, line2):
-        points = [Vec2(line1.dxf.start), Vec2(line1.dxf.end), Vec2(line2.dxf.start), Vec2(line2.dxf.end)]
-        min_point = min(points, key=lambda p: (p.x, p.y))
-        max_point = max(points, key=lambda p: (p.x, p.y))
-        return min_point, max_point
+    def add_lwpolyline(line):
+        simpMSP.add_lwpolyline([list(line[0])+list(line[0]),list(line[1])+list(line[1])])
 
-    lines = [e for e in msp if e.dxftype() == "LINE"]
-
-    lines.sort(key=lambda l: (l.dxf.start[0], l.dxf.start[1]))
-
-    simplified_lines = []
-    i = 0
-    while i < len(lines):
-        current_line = lines[i]
-        merged = False
-        j = i + 1
-        while j < len(lines):
-            next_line = lines[j]
-            if lines_are_collinear(current_line, next_line):
-                # Merge the lines
-                start, end = merge_collinear_lines(current_line, next_line)
-                current_line.dxf.start = start
-                current_line.dxf.end = end
-                merged = True
-                j += 1
-            else:
+    improved = True
+    while improved:
+        lines = [tuple(e.vertices()) for e in msp if e.dxftype() == "LWPOLYLINE"]
+        connectivityLINES = create_line_connectivity_map(lines)
+        processed_lines = []
+        improved = False
+        
+        for line in lines:
+            print(line)
+            try:
+                connected_line = [i for i in get_connected_lines(line,connectivityLINES) if i not in processed_lines][0]
+            except:
                 break
-        if not merged:
-            simplified_lines.append(current_line)
-        i = j
+            out = combine_lines(line,connected_line,0)
+            if out:
+                add_lwpolyline(out)
+                improved = True
+            else:
+                add_lwpolyline(line)
+                add_lwpolyline(connected_line)
+            processed_lines.append(connected_line)
 
-    for line in lines:
-        msp.delete_entity(line)
+    
+        if improved:
+            msp = simpMSP
+            simpDOC = ezdxf.new()
+            simpMSP = simpDOC.modelspace()
+        
+        break
 
-    for line in simplified_lines:
-        msp.add_line(line.dxf.start, line.dxf.end)
-
-    return doc
+    return simpDOC
+        

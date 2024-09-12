@@ -8,6 +8,9 @@ from ezdxf.math import Vec2
 import ezdxf
 import shutil
 from scipy.spatial.transform import Rotation as R
+from typing import List, Tuple, Dict, Union
+from ezdxf.addons.drawing import RenderContext, Frontend
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 
 
 import matplotlib.pyplot as plt
@@ -227,6 +230,71 @@ def find_signed_min_max_distances(points, plane_normal):
             max_point = point
     
     return min_point, min_distance, max_point, max_distance
+
+
+## smart slice
+Point = Tuple[float, float]
+Line = Tuple[Point, Point]
+
+def create_line_connectivity_map(lines: List[Line]) -> Dict[Point, List[Line]]:
+    connectivity_map = {}
+    
+    for line in lines:
+        start, end = line
+        
+        if start not in connectivity_map:
+            connectivity_map[start] = []
+        connectivity_map[start].append(line)
+        
+        if end not in connectivity_map:
+            connectivity_map[end] = []
+        connectivity_map[end].append(line)
+    
+    return connectivity_map
+
+def get_connected_lines(line: Line, connectivity_map: Dict[Point, List[Line]]) -> List[Line]:
+    start, end = line
+    connected_lines = set(connectivity_map.get(start, []) + connectivity_map.get(end, []))
+    connected_lines.discard(line)  # Remove the original line if present
+    return list(connected_lines)
+
+def combine_lines(line1: Line, line2: Line, tolerance: float = 1e-6) -> Union[Line, bool]:
+    def point_equal(p1: Point, p2: Point) -> bool:
+        return math.isclose(p1[0], p2[0], abs_tol=tolerance) and math.isclose(p1[1], p2[1], abs_tol=tolerance)
+
+    def vector(p1: Point, p2: Point) -> Point:
+        return (p2[0] - p1[0], p2[1] - p1[1])
+
+    def are_collinear(v1: Point, v2: Point) -> bool:
+        cross_product = v1[0] * v2[1] - v1[1] * v2[0]
+        return math.isclose(cross_product, 0, abs_tol=tolerance)
+
+    def distance(p1: Point, p2: Point) -> float:
+        return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[0])**2)
+
+    # Check if lines share an endpoint
+    shared_point = None
+    if point_equal(line1[0], line2[0]) or point_equal(line1[0], line2[1]):
+        shared_point = line1[0]
+    elif point_equal(line1[1], line2[0]) or point_equal(line1[1], line2[1]):
+        shared_point = line1[1]
+
+    # If lines share an endpoint and are collinear
+    if shared_point:
+        v1 = vector(line1[0], line1[1])
+        v2 = vector(line2[0], line2[1])
+        if are_collinear(v1, v2):
+            points = [p for p in line1 + line2 if not point_equal(p, shared_point)]
+            return (min(points, key=lambda p: (p[0], p[1])), max(points, key=lambda p: (p[0], p[1])))
+
+    # If lines don't share an endpoint, check for overlap
+    v = vector(line1[0], line1[1])
+    if are_collinear(v, vector(line1[0], line2[0])) and are_collinear(v, vector(line1[0], line2[1])):
+        all_points = line1 + line2
+        return (min(all_points, key=lambda p: (p[0], p[1])), max(all_points, key=lambda p: (p[0], p[1])))
+
+    # If lines can't be combined
+    return False
 
 
 ## plane combine
