@@ -95,16 +95,18 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
     return docList
 
 
-def strip_pack_dwg(docs:list,width = 100):
+def strip_pack_dwg(docs:list,width = None):
     packed = ezdxf.new()
     packedMSP = packed.modelspace()
     
     def add_doc(doc,pos,dim):
         msp = doc.modelspace()
         corner = [dim[1][0],dim[0][1]]
-        for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLNE"]:
+        for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]:
             packedMSP.add_lwpolyline(i.translate(pos[0]-corner[0],pos[1]-corner[1],0))
     
+    
+    w = 0
     maxmin = []
     for doc in docs:
         msp = doc.modelspace()
@@ -123,14 +125,22 @@ def strip_pack_dwg(docs:list,width = 100):
                 elif max[1] < point[1]:
                     max[1] = point[1]
         maxmin.append([max,min])
+        w += max[0]-min[0]
+    
+    if not width:
+        width = w/5
     
     dimensions = [[i[0][0]-i[1][0],i[0][1]-i[1][1]] for i in maxmin]
     
     height, out = strip_pack(width,dimensions)
+    print(dimensions)
     for i in out:
-        d = dimensions.index([i.w,i.h])
-        print(d,maxmin[d])
-        add_doc(docs[d],[i.x,i.y],maxmin[d])
+        try:
+            d = dimensions.index([i.w,i.h])
+            add_doc(docs[d],[i.x,i.y],maxmin[d])
+        except:
+            d = dimensions.index([i.h,i.w])
+            add_doc((docs[d],90),[i.x,i.y],maxmin[d])  ### TODO: needs to accomodate rotation by 90 degree for packing
         docs.pop(d)
         maxmin.pop(d)
         dimensions.pop(d)
@@ -152,7 +162,7 @@ def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float 
     removedZ = [i for i in docZ if i not in singleZ]
 
 
-    return strip_pack_dwg(docX)
+    return strip_pack_dwg([strip_pack_dwg(docX),strip_pack_dwg(docY),strip_pack_dwg(docZ)])
 
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
