@@ -1,9 +1,7 @@
 import ezdxf.document
-import ezdxf.document
-import ezdxf.document
 import ezdxf.entities
 from .tools import *
-
+from collections import defaultdict
 
 # global function
 def removeUnneededlines(doc,triangleErrorRange:float = 0,printDeets:bool = False):
@@ -96,63 +94,65 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 
     return docList
 
-def pack_dwg_files_no_overlap(docs,printDeets:bool = False):
-    combined_doc = ezdxf.new()
-    combined_msp = combined_doc.modelspace()
-    current_position = (0, 0, 0)
+
+def strip_pack_dwg(docs:list,width = 100):
+    packed = ezdxf.new()
+    packedMSP = packed.modelspace()
     
-    n = 0
+    def add_doc(doc,pos,dim):
+        msp = doc.modelspace()
+        corner = [dim[1][0],dim[0][1]]
+        for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLNE"]:
+            packedMSP.add_lwpolyline(i.translate(pos[0]-corner[0],pos[1]-corner[1],0))
+    
+    maxmin = []
     for doc in docs:
-        n+=1
-        entities = doc.modelspace()
-        
-        min_point = [float('inf'), float('inf'), float('inf')]
-        max_point = [-float('inf'), -float('inf'), -float('inf')]
-        
-        # Find extents of all entities in the document
-        for entity in entities:
-            entity_min, entity_max = get_entity_extents(entity)
-            
-            min_point[0] = min(min_point[0], entity_min[0])
-            min_point[1] = min(min_point[1], entity_min[1])
-            min_point[2] = min(min_point[2], entity_min[2])
-            
-            max_point[0] = max(max_point[0], entity_max[0])
-            max_point[1] = max(max_point[1], entity_max[1])
-            max_point[2] = max(max_point[2], entity_max[2])
-        
-        # Calculate translation vector
-        translation = (
-            current_position[0] - min_point[0],
-            current_position[1] - min_point[1],
-            current_position[2] - min_point[2]
-        )
-        
-        # Translate entities in the DWG file and collect new entities
-        new_entities = translate_entities(entities, translation)
-        
-        # Add new entities to the combined document
-        for new_entity in new_entities:
-            combined_msp.add_entity(new_entity)
-        
-        # Update current_position for the next DWG
-        current_position = (
-            max_point[0] + 10,  # Adding 10 units as a gap to avoid overlap
-            current_position[1],
-            current_position[2]
-        )
-        printIF(printDeets,f"{n}/{len(docs)} inserted dwg at {translation}","pack_dwg_files_no_overlap")
+        msp = doc.modelspace()
+        lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
+        min = list(list(lwpolyline[0].vertices())[0])
+        max = list(list(lwpolyline[0].vertices())[0])
+        for line in lwpolyline:
+            for point in list(line.vertices()):
+                if min[0] > point[0]:
+                    min[0] = point[0]
+                elif max[0] < point[0]:
+                    max[0] = point[0]
+                    
+                if min[1] > point[1]:
+                    min[1] = point[1]
+                elif max[1] < point[1]:
+                    max[1] = point[1]
+        maxmin.append([max,min])
     
-    return combined_doc
+    dimensions = [[i[0][0]-i[1][0],i[0][1]-i[1][1]] for i in maxmin]
+    
+    height, out = strip_pack(width,dimensions)
+    for i in out:
+        d = dimensions.index([i.w,i.h])
+        print(d,maxmin[d])
+        add_doc(docs[d],[i.x,i.y],maxmin[d])
+        docs.pop(d)
+        maxmin.pop(d)
+        dimensions.pop(d)
+    
+    return packed
+
 
 def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,printDeets:bool = True):
     docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
     docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
     docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
 
-    print(dwg_components(docX[0]))
+    singleX = [i for i in docX if count_closed_parts(i) == 1]
+    singleY = [i for i in docY if count_closed_parts(i) == 1]
+    singleZ = [i for i in docZ if count_closed_parts(i) == 1]
+    
+    removedX = [i for i in docX if i not in singleX]
+    removedY = [i for i in docY if i not in singleY]
+    removedZ = [i for i in docZ if i not in singleZ]
 
-    return docX[0]
+
+    return strip_pack_dwg(docX)
 
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
@@ -204,35 +204,84 @@ def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
 
     return simpDOC
 
-def dwg_components(doc:ezdxf.document.Drawing):
-    msp = doc.modelspace()
+def create_graph(entities):
+    """Create a graph where points are nodes, and connected entities are edges."""
+    graph = defaultdict(list)
 
-    G = nx.Graph()
-
-    def add_edge(p1, p2):
-        G.add_edge(tuple(p1), tuple(p2))
-        print(f"added {p1}, {p2}")
-
-    for entity in msp:
-        if entity.dxftype() == 'LINE':
-            add_edge(entity.dxf.start, entity.dxf.end)
+    for entity in entities:
+        if entity.dxftype() == 'LWPOLYLINE' or entity.dxftype() == 'POLYLINE':
+            points = entity.get_points()
+            for i in range(len(points) - 1):
+                graph[tuple(points[i])].append(tuple(points[i + 1]))
+                graph[tuple(points[i + 1])].append(tuple(points[i]))
+            if entity.is_closed:
+                graph[tuple(points[-1])].append(tuple(points[0]))
+                graph[tuple(points[0])].append(tuple(points[-1]))
+        elif entity.dxftype() == 'LINE':
+            start = entity.dxf.start
+            end = entity.dxf.end
+            graph[tuple(start)].append(tuple(end))
+            graph[tuple(end)].append(tuple(start))
         elif entity.dxftype() == 'CIRCLE':
-            center = entity.dxf.center
-            radius = entity.dxf.radius
-            for i in range(8):
-                angle = i * 45
-                point = Vec2.from_deg_angle(angle) * radius + Vec2(center)
-                add_edge(center, point)
-        elif entity.dxftype() == 'ARC':
-            center = entity.dxf.center
-            radius = entity.dxf.radius
-            start_angle = entity.dxf.start_angle
-            end_angle = entity.dxf.end_angle
-            for angle in range(int(start_angle), int(end_angle) + 45, 45):
-                point = Vec2.from_deg_angle(angle) * radius + Vec2(center)
-                add_edge(center, point)
+            # A circle is inherently closed, so we treat it as a single closed part
+            center = tuple(entity.dxf.center[:2])
+            graph[center].append(center)
 
-    num_components = nx.number_connected_components(G)
+    return graph
 
-    return num_components
-        
+def find_closed_loops(graph):
+    """Find closed loops in the graph using a DFS-like approach."""
+    visited = set()
+    closed_parts = 0
+
+    def dfs(node, parent, path):
+        visited.add(node)
+        path.append(node)
+
+        for neighbor in graph[node]:
+            if neighbor not in visited:
+                if dfs(neighbor, node, path):
+                    return True
+            elif neighbor == path[0] and len(path) > 2:
+                # Found a closed loop
+                return True
+
+        path.pop()
+        return False
+
+    for node in graph:
+        if node not in visited:
+            path = []
+            if dfs(node, None, path):
+                closed_parts += 1
+
+    return closed_parts
+
+def count_closed_parts(doc:ezdxf.document.Drawing):
+    """
+    Count how many closed parts (connected shapes forming closed loops) are inside the DWG file.
+    Parameters:
+    dwg_file_path (str): Path to the DWG file.
+    Returns:
+    int: Number of closed parts detected in the DWG file.
+    """
+    try:
+        # Load the DWG file
+        modelspace = doc.modelspace()
+
+        entities = []
+        # Collect relevant entities
+        for entity in modelspace:
+            if entity.dxftype() in ['LWPOLYLINE', 'POLYLINE', 'LINE', 'CIRCLE']:
+                entities.append(entity)
+
+        # Create graph of connected points
+        graph = create_graph(entities)
+
+        # Find and count closed loops (parts)
+        return find_closed_loops(graph)
+
+
+    except ezdxf.DXFStructureError:
+        print("Error: Invalid or corrupted DWG file.")
+        return 0

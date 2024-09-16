@@ -5,6 +5,7 @@ path = "data/stl/hollow_cube.stl"
 dh.clear_output_paths()
 #dh.startreadingterminal()
 
+
 dh.view_drawing(dh.smart_slice_stl(dh.trimesh.load_mesh(path),printDeets=False),dh.image_output_dir)
 
 #dh.stopreadingterminal()
