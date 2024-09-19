@@ -13,6 +13,7 @@ from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from collections import namedtuple
 from copy import deepcopy
+from shapely.geometry import Polygon, Point
 
 
 import matplotlib.pyplot as plt
@@ -235,10 +236,10 @@ def find_signed_min_max_distances(points, plane_normal):
 
 
 ## smart slice
-Point = Tuple[float, float]
+Points = Tuple[float, float]
 Line = Tuple[Point, Point]
 
-def create_line_connectivity_map(lines: List[Line]) -> Dict[Point, List[Line]]:
+def create_line_connectivity_map(lines: List[Line]) -> Dict[Points, List[Line]]:
     connectivity_map = {}
     
     for line in lines:
@@ -254,7 +255,7 @@ def create_line_connectivity_map(lines: List[Line]) -> Dict[Point, List[Line]]:
     
     return connectivity_map
 
-def get_connected_lines(line: Line, connectivity_map: Dict[Point, List[Line]]) -> List[Line]:
+def get_connected_lines(line: Line, connectivity_map: Dict[Points, List[Line]]) -> List[Line]:
     start, end = line
     connected_lines = set(connectivity_map.get(start, []) + connectivity_map.get(end, []))
     connected_lines.discard(line)  # Remove the original line if present
@@ -498,3 +499,24 @@ def printIF(boolean:bool,printString:str,precursor:str = "sys"):
     if boolean:
         print_styled(precursor+":",33,"1",end=" ")
         print(printString)
+
+def rotate_dxf(dxf_doc: ezdxf.document.Drawing, angle_deg: float = 90) -> ezdxf.document.Drawing:
+    angle_rad = math.radians(angle_deg)  # Convert the angle to radians
+    cos_angle = math.cos(angle_rad)
+    sin_angle = math.sin(angle_rad)
+
+    def rotate_point(x, y):
+        """Apply 2D rotation matrix."""
+        x_new = x * cos_angle - y * sin_angle
+        y_new = x * sin_angle + y * cos_angle
+        return x_new, y_new
+
+    msp = dxf_doc.modelspace()
+    for entity in msp:
+        if entity.dxftype() == 'LWPOLYLINE':
+            points = entity.get_points("xy")
+            rotated_points = [rotate_point(x, y) for x, y in points]
+            entity.set_points(rotated_points)
+
+
+    return dxf_doc

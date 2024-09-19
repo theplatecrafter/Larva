@@ -164,9 +164,10 @@ def DEVview_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png
     ax.set_ylim(ylim)
     ax.set_zlim(zlim)
 
+
+    plt.savefig(f"{output_dir}/{output_name}")
     if not onlySave:
         plt.show()
-    plt.savefig(f"{output_dir}/{output_name}")
 
     if return_info:
         info = {

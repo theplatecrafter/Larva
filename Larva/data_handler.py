@@ -94,10 +94,10 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 
     return docList
 
-
 def strip_pack_dwg(docs:list,width = None):
     packed = ezdxf.new()
     packedMSP = packed.modelspace()
+    docs = [i for i in docs if len(i.modelspace()) != 0]
     
     def add_doc(doc,pos,dim):
         msp = doc.modelspace()
@@ -128,41 +128,55 @@ def strip_pack_dwg(docs:list,width = None):
         w += max[0]-min[0]
     
     if not width:
-        width = w/5
+        width = w/2
     
     dimensions = [[i[0][0]-i[1][0],i[0][1]-i[1][1]] for i in maxmin]
     
     height, out = strip_pack(width,dimensions)
-    print(dimensions)
     for i in out:
         try:
             d = dimensions.index([i.w,i.h])
             add_doc(docs[d],[i.x,i.y],maxmin[d])
         except:
             d = dimensions.index([i.h,i.w])
-            add_doc((docs[d],90),[i.x,i.y],maxmin[d])  ### TODO: needs to accomodate rotation by 90 degree for packing
+            docs[d] = rotate_dxf(docs[d])
+            msp = docs[d].modelspace()
+            lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
+            min = list(list(lwpolyline[0].vertices())[0])
+            max = list(list(lwpolyline[0].vertices())[0])
+            for line in lwpolyline:
+                for point in list(line.vertices()):
+                    if min[0] > point[0]:
+                        min[0] = point[0]
+                    elif max[0] < point[0]:
+                        max[0] = point[0]
+                        
+                    if min[1] > point[1]:
+                        min[1] = point[1]
+                    elif max[1] < point[1]:
+                        max[1] = point[1]
+            add_doc(docs[d],[i.x,i.y],[max,min])  ### TODO: needs to accomodate rotation by 90 degree for packing
         docs.pop(d)
         maxmin.pop(d)
         dimensions.pop(d)
     
     return packed
 
-
 def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,printDeets:bool = True):
     docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
     docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
     docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
 
-    singleX = [i for i in docX if count_closed_parts(i) == 1]
-    singleY = [i for i in docY if count_closed_parts(i) == 1]
-    singleZ = [i for i in docZ if count_closed_parts(i) == 1]
+    singleX = [i for i in docX if count_components(i) == 1]
+    singleY = [i for i in docY if count_components(i) == 1]
+    singleZ = [i for i in docZ if count_components(i) == 1]
     
     removedX = [i for i in docX if i not in singleX]
     removedY = [i for i in docY if i not in singleY]
     removedZ = [i for i in docZ if i not in singleZ]
 
 
-    return strip_pack_dwg([strip_pack_dwg(docX),strip_pack_dwg(docY),strip_pack_dwg(docZ)])
+    return docX[0]
 
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
@@ -239,21 +253,22 @@ def create_graph(entities):
 
     return graph
 
-def find_closed_loops(graph):
-    """Find closed loops in the graph using a DFS-like approach."""
+def extract_loops(graph):
+    """Extract closed loops from the graph using a DFS-like approach."""
     visited = set()
-    closed_parts = 0
+    loops = []
 
-    def dfs(node, parent, path):
+    def dfs(node, path):
         visited.add(node)
         path.append(node)
 
         for neighbor in graph[node]:
             if neighbor not in visited:
-                if dfs(neighbor, node, path):
-                    return True
+                if dfs(neighbor, path):
+                    return path
             elif neighbor == path[0] and len(path) > 2:
                 # Found a closed loop
+                loops.append(path.copy())
                 return True
 
         path.pop()
@@ -262,21 +277,40 @@ def find_closed_loops(graph):
     for node in graph:
         if node not in visited:
             path = []
-            if dfs(node, None, path):
-                closed_parts += 1
+            dfs(node, path)
 
-    return closed_parts
+    return loops
 
-def count_closed_parts(doc:ezdxf.document.Drawing):
+def is_loop_inside(outer, inner):
+    """Check if the inner loop is completely inside the outer loop."""
+    # Extract only the (x, y) coordinates from each point in the loop
+    outer_polygon = Polygon([(p[0], p[1]) for p in outer])
+    
+    for point in inner:
+        # Ensure Point is from shapely.geometry
+        if not outer_polygon.contains(Point(point[0], point[1])):
+            return False
+    return True
+
+def filter_bigger_loops(loops):
+    """Filter out smaller loops that are contained inside larger loops."""
+    bigger_loops = []
+    for i, loop in enumerate(loops):
+        is_inside = False
+        for j, other_loop in enumerate(loops):
+            if i != j and is_loop_inside(other_loop, loop):
+                is_inside = True
+                break
+        if not is_inside:
+            bigger_loops.append(loop)
+    return bigger_loops
+
+def count_components(doc: ezdxf.document.Drawing):
     """
-    Count how many closed parts (connected shapes forming closed loops) are inside the DWG file.
-    Parameters:
-    dwg_file_path (str): Path to the DWG file.
-    Returns:
-    int: Number of closed parts detected in the DWG file.
+    Count how many components (distinct loops, ignoring smaller loops inside larger ones) are inside the DXF file.
     """
     try:
-        # Load the DWG file
+        # Load the DXF file
         modelspace = doc.modelspace()
 
         entities = []
@@ -288,10 +322,14 @@ def count_closed_parts(doc:ezdxf.document.Drawing):
         # Create graph of connected points
         graph = create_graph(entities)
 
-        # Find and count closed loops (parts)
-        return find_closed_loops(graph)
+        # Extract closed loops (parts)
+        loops = extract_loops(graph)
 
+        # Filter out smaller loops inside larger loops
+        bigger_loops = filter_bigger_loops(loops)
+
+        return len(bigger_loops)
 
     except ezdxf.DXFStructureError:
-        print("Error: Invalid or corrupted DWG file.")
+        print("Error: Invalid or corrupted DXF file.")
         return 0
