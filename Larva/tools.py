@@ -16,6 +16,7 @@ from copy import deepcopy
 from shapely.geometry import Polygon, Point
 
 
+import plotly.graph_objects as go  # numpy-stl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from skimage.measure import label

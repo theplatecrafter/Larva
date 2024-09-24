@@ -324,6 +324,45 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
     print(f"DWG view saved as {image_path}")
 
 
+def Bs_view_stl(stl_path:str):
+    
+    data = m.Mesh.from_file(stl_path)
+    # reshape Nx3x3 to N*3x3 to convert polygons to points
+    points = data.vectors.reshape(-1, 3)
+    faces_index = np.arange(len(points))  # get indexes of points
+
+    N=3
+    rows = (np.arange(points.shape[0])%N == (N-1)) + 1
+    triangles = np.repeat(points, rows, axis=0)
+    triangles = np.insert(triangles, [*range(4, len(triangles), 4)], [np.nan, np.nan, np.nan], axis=0)
+
+    lines = [
+            go.Mesh3d(
+            x = points[:,0],  # pass first column of points array
+            y = points[:,1],  # .. second column
+            z = points[:,2],  # .. third column
+            # i, j and k give the vertices of triangles
+            i = faces_index[0::3],  # indexes of the points. k::3 means pass every third element 
+            j = faces_index[1::3],  # starting from k element
+            k = faces_index[2::3],  # for example 2::3 in arange would be 2,5,8,...
+            opacity = 0.5,
+            color='lightpink'
+        ),
+        go.Scatter3d(
+            x=triangles[:,0],  # pass first column of points array
+            y=triangles[:,1],  # .. second column
+            z=triangles[:,2],  # .. third column
+            mode='lines',
+            name='',
+            line=dict(color='rgb(25,25,25)', width=7)
+        )]
+    
+    
+    fig = go.Figure(data=lines)
+    fig.update_layout(width=1000, height=1000)
+
+    fig.show()
+
 
 def view_drawing(doc: ezdxf.document.Drawing, save_path: str = None):
     doc.saveas(os.path.join(dwg_output_dir,"temp.dxf"))
