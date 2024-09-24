@@ -85,7 +85,10 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
     out = find_signed_min_max_distances(points,slicePlaneNormal)
     minPoint = out[0]
     maxPoint = out[2]
-    sliceNumbers = math.ceil(np.linalg.norm(maxPoint-minPoint)/sliceWidth)
+    printIF(printDeets,f"min point:{minPoint} max point:{maxPoint}")
+    a = np.array([maxPoint[i] for i in range(len(maxPoint)) if float(slicePlaneNormal[i]) != 0])
+    i = np.array([minPoint[i] for i in range(len(minPoint)) if float(slicePlaneNormal[i]) != 0])
+    sliceNumbers = math.ceil(np.linalg.norm(a-i)/sliceWidth)
     slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i*sliceWidth for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
         doc = slice_stl(input_trimesh,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets)
@@ -94,7 +97,7 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 
     return docList
 
-def strip_pack_dwg(docs:list,width = None):
+def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
     packed = ezdxf.new()
     packedMSP = packed.modelspace()
     docs = [i for i in docs if len(i.modelspace()) != 0]
@@ -132,7 +135,7 @@ def strip_pack_dwg(docs:list,width = None):
     
     dimensions = [[i[0][0]-i[1][0],i[0][1]-i[1][1]] for i in maxmin]
     
-    height, out = strip_pack(width,dimensions)
+    height, out = strip_pack(width,dimensions,noturn=noturn)
     for i in out:
         try:
             d = dimensions.index([i.w,i.h])
@@ -162,7 +165,7 @@ def strip_pack_dwg(docs:list,width = None):
     
     return packed
 
-def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,printDeets:bool = True):
+def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True):
     docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
     docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
     docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
@@ -176,7 +179,7 @@ def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float 
     removedZ = [i for i in docZ if i not in singleZ]
 
 
-    return docX[0]
+    return strip_pack_dwg([strip_pack_dwg(singleX,noturn=True),strip_pack_dwg(singleY,noturn=True),strip_pack_dwg(singleZ,noturn=True)],noturn=True)
 
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()

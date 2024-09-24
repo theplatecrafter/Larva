@@ -1,12 +1,15 @@
 import Larva.direct_data_handler as dh
 
-path = "data/stl/test_subject.stl"
+path = "data/stl/complex_stl/tiefighter.stl"
+tri = dh.trimesh.load_mesh(path)
 
 dh.clear_output_paths()
-#dh.startreadingterminal()
+##dh.startreadingterminal()
 
 dh.DEVview_stl(path,dh.image_output_dir)
-##dh.view_drawing(dh.slice_stl(dh.trimesh.load_mesh(path),[0,0,1],[0,0,0],printDeets=False),dh.image_output_dir)
-dh.view_drawing(dh.smart_slice_stl(dh.trimesh.load_mesh(path),printDeets=False),dh.image_output_dir)
 
-#dh.stopreadingterminal()
+
+d = dh.smart_slice_stl(tri,1,printDeets=False)
+dh.view_drawing(d,dh.image_output_dir)
+
+##dh.stopreadingterminal()

@@ -305,7 +305,9 @@ def combine_lines(line1: Line, line2: Line, tolerance: float = 1e-6) -> Union[Li
 Rectangle = namedtuple('Rectangle', ['x', 'y', 'w', 'h'])
 
 
-def strip_pack(width, rectangles, sorting="width"):
+def strip_pack(width, rectangles, sorting="width",noturn:bool = False):
+    if noturn:
+        return strip_pack_noturn(width,rectangles,sorting)
     if sorting == "width":
         wh = 0
     else:
@@ -328,6 +330,54 @@ def strip_pack(width, rectangles, sorting="width"):
             result[idx] = Rectangle(x, y, r[1], r[0])
             x, y, w, h, H = r[1], H, width - r[1], r[0], H + r[0]
         recursive_packing(x, y, w, h, 1, remaining, sorted_indices, result)
+        x, y = 0, H
+
+    return H, result
+
+def strip_pack_noturn(width, rectangles, sorting="width"):
+    """
+    The PH heuristic for the Strip Packing Problem. This is the OG variant, which means that rotations are
+    NOT allowed and that there is a guillotine contraint.
+
+    Parameters
+    ----------
+    width
+        The width of the strip.
+
+    rectangles
+        List of list containing width and height of every rectangle, [[w_1, h_1], ..., [w_n,h_h]].
+        It is assumed that all rectangles can fit into the strip.
+
+    sorting : string, {'width', 'height'}, default='width'
+        The heuristic uses sorting to determine which rectangles to place first.
+        By default sorting happens on the width but can be changed to height.
+
+    Returns
+    -------
+    height
+        The height of the strip needed to pack all the items.
+    rectangles : list of namedtuple('Rectangle', ['x', 'y', 'w', 'h'])
+        A list of rectangles, in the same order as the input list. This contains bottom left x and y coordinate and
+        the width and height (which can be flipped compared to input).
+
+    """
+    if sorting not in ["width", "height" ]:
+        raise ValueError("The algorithm only supports sorting by width or height but {} was given.".format(sorting))
+    if sorting == "width":
+        wh = 0
+    else:
+        wh = 1
+    result = [None] * len(rectangles)
+    remaining = deepcopy(rectangles)
+    sorted_indices = sorted(range(len(remaining)), key=lambda x: -remaining[x][wh])
+    sorted_rect = [remaining[idx] for idx in sorted_indices]
+    x, y, w, h, H = 0, 0, 0, 0, 0
+    while sorted_indices:
+        idx = sorted_indices.pop(0)
+        r = remaining[idx]
+        result[idx] = Rectangle(x, y, r[0], r[1])
+        x, y, w, h, H = r[0], H, width - r[0], r[1], H + r[1]
+        recursive_packing(x, y, w, h, 0, remaining, sorted_indices, result)
         x, y = 0, H
 
     return H, result
