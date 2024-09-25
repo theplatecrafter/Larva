@@ -280,7 +280,9 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
             points = list(entity.vertices())  # Get all vertices
             points.append(points[0])  # Close the polyline if it's closed
             x, y = zip(*points)  # Separate x and y coordinates
-            ax.plot(x, y, color='blue', lw=1)
+            colorRGB = tuple(np.array(ezdxf.colors.aci2rgb(entity.dxf.color))/255)
+            ax.plot(x, y, color=colorRGB, lw=1)
+            
     
     # Highlight start and end points if provided
     if start_end_points:
@@ -345,7 +347,7 @@ def Bs_view_stl(stl_path:str):
             i = faces_index[0::3],  # indexes of the points. k::3 means pass every third element 
             j = faces_index[1::3],  # starting from k element
             k = faces_index[2::3],  # for example 2::3 in arange would be 2,5,8,...
-            opacity = 0.5,
+            opacity = 1,
             color='lightpink'
         ),
         go.Scatter3d(

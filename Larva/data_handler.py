@@ -1,5 +1,6 @@
 import ezdxf.document
 import ezdxf.entities
+import ezdxf.entities
 from .tools import *
 from collections import defaultdict
 
@@ -74,6 +75,7 @@ def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list
         for decomposed in entity.explode():
             line = decomposed.bounds(slice_2d.vertices)
             msp.add_lwpolyline([list(line[0]) + list(line[0]),list(line[1]) + list(line[1])])
+            msp[-1].dxf.color = 5
             printIF(printDeets,f"{decomposed} has line data: {decomposed.bounds(slice_2d.vertices)}","slice_3d_stl")
 
     return doc
@@ -89,7 +91,7 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
     a = np.array([maxPoint[i] for i in range(len(maxPoint)) if float(slicePlaneNormal[i]) != 0])
     i = np.array([minPoint[i] for i in range(len(minPoint)) if float(slicePlaneNormal[i]) != 0])
     sliceNumbers = math.ceil(np.linalg.norm(a-i)/sliceWidth)
-    slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i*sliceWidth for i in range(sliceNumbers)]
+    slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i*sliceWidth+(slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*sliceWidth/2 for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
         doc = slice_stl(input_trimesh,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets)
         docList.append(doc)
@@ -97,6 +99,67 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 
     return docList
 
+def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool = False):
+    packed = ezdxf.new()
+    packedMSP = packed.modelspace()
+    docs = [i for i in docs if len(i.modelspace()) != 0]
+    
+    
+    if not Xcount:
+        Xcount = math.ceil(math.sqrt(len(docs)))
+    
+    def add_doc(doc,pos,dim):
+        msp = doc.modelspace()
+        corner = [dim[1][0],dim[0][1]]
+        for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]:
+            packedMSP.add_lwpolyline(i.translate(pos[0]-corner[0],pos[1]-corner[1],0))
+            packedMSP[-1].dxf.color = i.dxf.color
+    
+    x = 0
+    m = 0
+    y = 0
+    maxY = 0
+    for doc in docs:
+        m+=1
+        msp = doc.modelspace()
+        lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
+        min = list(list(lwpolyline[0].vertices())[0])
+        max = list(list(lwpolyline[0].vertices())[0])
+        for line in lwpolyline:
+            for point in list(line.vertices()):
+                if min[0] > point[0]:
+                    min[0] = point[0]
+                elif max[0] < point[0]:
+                    max[0] = point[0]
+                    
+                if min[1] > point[1]:
+                    min[1] = point[1]
+                elif max[1] < point[1]:
+                    max[1] = point[1]
+        if max[1]-min[1] > maxY:
+            maxY = max[1]-min[1]
+
+
+        add_doc(doc,(x,y),(max,min))
+        if m == Xcount:
+            y-=maxY+margin
+            if addGridLine:
+                packedMSP.add_lwpolyline([(margin*-1/2,y+margin/2,0,0),(x+max[0]-min[0]+margin/2,y+margin/2,0,0)])
+                packedMSP[-1].dxf.color = 1
+            x = 0
+            m = 0
+            maxY = 0
+        else:
+            x+=max[0]-min[0]+margin
+            if addGridLine:
+                packedMSP.add_lwpolyline([(x-margin/2,y+margin/2,0,0),(x-margin/2,y-max[1]+min[1]-margin/2,0,0)])
+                packedMSP[-1].dxf.color = 1
+                
+    if addGridLine:
+        packedMSP.delete_entity(packedMSP[-1])
+            
+    return packed
+    
 def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
     packed = ezdxf.new()
     packedMSP = packed.modelspace()
@@ -107,6 +170,7 @@ def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
         corner = [dim[1][0],dim[0][1]]
         for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]:
             packedMSP.add_lwpolyline(i.translate(pos[0]-corner[0],pos[1]-corner[1],0))
+            packedMSP[-1].dxf.color = i.dxf.color
     
     
     w = 0
@@ -187,8 +251,9 @@ def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     simpDOC = ezdxf.new()
     simpMSP = simpDOC.modelspace()
 
-    def add_lwpolyline(line):
+    def add_lwpolylinez(line):
         simpMSP.add_lwpolyline([list(line[0]) + list(line[0]), list(line[1]) + list(line[1])])
+        simpMSP[-1].dxf.color = 5
 
     improved = True
     while improved:
@@ -210,16 +275,16 @@ def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
                 for connected_line in connected_lines:
                     combined_line = combine_lines(line, connected_line, 0)
                     if combined_line:
-                        add_lwpolyline(combined_line)
+                        add_lwpolylinez(combined_line)
                         processed_lines.add(line)
                         processed_lines.add(connected_line)
                         improved = True
                         break
                 else:
-                    add_lwpolyline(line)
+                    add_lwpolylinez(line)
                     processed_lines.add(line)
             else:
-                add_lwpolyline(line)
+                add_lwpolylinez(line)
                 processed_lines.add(line)
 
         if improved:

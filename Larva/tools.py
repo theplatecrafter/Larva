@@ -6,6 +6,7 @@ import trimesh
 import networkx as nx
 from ezdxf.math import Vec2
 import ezdxf
+import ezdxf.colors
 import shutil
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Dict, Union
@@ -428,6 +429,22 @@ def recursive_packing(x, y, w, h, D, remaining, indices, result):
             else:
                 recursive_packing(x, y + d, omega, h - d, D, remaining, indices, result)
                 recursive_packing(x + omega, y, w - omega, h, D, remaining, indices, result)
+
+
+def calculate_stl_dimensions(stl_file_path):
+    # Load the STL file using trimesh
+    mesh = trimesh.load_mesh(stl_file_path)
+    
+    # Get the bounding box of the mesh
+    bounding_box = mesh.bounding_box.bounds
+    
+    # Extract dimensions
+    length = bounding_box[1][0] - bounding_box[0][0]
+    width = bounding_box[1][1] - bounding_box[0][1]
+    height = bounding_box[1][2] - bounding_box[0][2]
+
+    return length, width, height
+
 
 
 
