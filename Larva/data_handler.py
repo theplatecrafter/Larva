@@ -5,32 +5,6 @@ from .tools import *
 from collections import defaultdict
 
 # global function
-def removeUnneededlines(doc,triangleErrorRange:float = 0,printDeets:bool = False):
-    msp = doc.modelspace()
-    t = [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]
-
-    tri = []
-    for i in range(len(t)):
-        p = t[i].get_points()
-        if len(p) == 4:
-            p.pop()
-        for j in range(len(p)):
-            p[j] = p[j][:2]
-        tri.append(p)
-    printIF(printDeets,"extracted triangle datas","removeUnneededlines")
-    invTri = []
-    for i in rmSame(tri):
-        if not is_valid_triangle(i,triangleErrorRange):
-            invTri.append(i)
-
-    newDoc = ezdxf.new()
-    newMSP = newDoc.modelspace()
-    for i in invTri:
-        newMSP.add_lwpolyline(i)
-    printIF(printDeets,"extracted triangle datas","removeUnneededlines")
-    
-    return newDoc
-
 def return_dwg_parts(doc,printDeets:bool = False):
     msp = doc.modelspace()
     
@@ -49,6 +23,10 @@ def return_dwg_parts(doc,printDeets:bool = False):
         docs.append(tmpdoc)
     
     return docs
+
+
+
+# base slicers
 
 def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list ,printDeets:bool = True):
     """
@@ -99,6 +77,64 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 
     return docList
 
+
+
+# smart slicers
+
+def directional_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True) -> list:
+    docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
+    docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
+    docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
+
+    singleX = [i for i in docX if count_components(i) == 1]
+    singleY = [i for i in docY if count_components(i) == 1]
+    singleZ = [i for i in docZ if count_components(i) == 1]
+    
+    removedX = [i for i in docX if i not in singleX]
+    removedY = [i for i in docY if i not in singleY]
+    removedZ = [i for i in docZ if i not in singleZ]
+
+
+    return singleX + singleY + singleZ ## TODO
+
+def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNormal:list=None,printDeets:bool = False,margin:float = 6) -> list:
+    if not slicePlaneNormal:
+        x = gided_layer_slice_stl(input_trimesh,sliceWidth,[1,0,0],printDeets)
+        y = gided_layer_slice_stl(input_trimesh,sliceWidth,[0,1,0],printDeets)
+        z = gided_layer_slice_stl(input_trimesh,sliceWidth,[0,0,1],printDeets)
+        
+        xD = [get_dwg_minmaxP(i,True) for i in x]
+        yD = [get_dwg_minmaxP(i,True) for i in y]
+        zD = [get_dwg_minmaxP(i,True) for i in z]
+        
+        xDi = sum([i[0]*i[1] for i in xD])
+        yDi = sum([i[0]*i[1] for i in yD])
+        zDi = sum([i[0]*i[1] for i in zD])
+        
+        return min({
+                x:xDi,
+                y:yDi,
+                z:zDi
+        })
+    else:
+        docs = width_slice_stl(input_trimesh,sliceWidth,slicePlaneNormal,printDeets)
+        for doc in docs:
+            msp = doc.modelspace()
+            max,min = get_dwg_minmaxP(doc)
+            marg = np.array([sliceWidth+margin,sliceWidth+margin])
+            msp.add_lwpolyline([
+                list(min+(-(sliceWidth+margin),-(sliceWidth+margin)))+[0,0],
+                list((min[0],max[1])+(-(sliceWidth+margin),sliceWidth+margin))+[0,0],
+                list(max+(sliceWidth+margin,sliceWidth+margin))+[0,0],
+                list((max[0],min[1])+(sliceWidth+margin,-(sliceWidth+margin)))+[0,0]
+            ])
+            msp[-1].dxf.color = 5
+            for i in range((1,0),(0,1),(-1,0),(0,-1)):
+                
+
+
+# dwg packers
+
 def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool = False):
     packed = ezdxf.new()
     packedMSP = packed.modelspace()
@@ -121,21 +157,7 @@ def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool 
     maxY = 0
     for doc in docs:
         m+=1
-        msp = doc.modelspace()
-        lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
-        min = list(list(lwpolyline[0].vertices())[0])
-        max = list(list(lwpolyline[0].vertices())[0])
-        for line in lwpolyline:
-            for point in list(line.vertices()):
-                if min[0] > point[0]:
-                    min[0] = point[0]
-                elif max[0] < point[0]:
-                    max[0] = point[0]
-                    
-                if min[1] > point[1]:
-                    min[1] = point[1]
-                elif max[1] < point[1]:
-                    max[1] = point[1]
+        max,min = get_dwg_minmaxP(doc)
         if max[1]-min[1] > maxY:
             maxY = max[1]-min[1]
 
@@ -176,21 +198,7 @@ def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
     w = 0
     maxmin = []
     for doc in docs:
-        msp = doc.modelspace()
-        lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
-        min = list(list(lwpolyline[0].vertices())[0])
-        max = list(list(lwpolyline[0].vertices())[0])
-        for line in lwpolyline:
-            for point in list(line.vertices()):
-                if min[0] > point[0]:
-                    min[0] = point[0]
-                elif max[0] < point[0]:
-                    max[0] = point[0]
-                    
-                if min[1] > point[1]:
-                    min[1] = point[1]
-                elif max[1] < point[1]:
-                    max[1] = point[1]
+        max,min = get_dwg_minmaxP(doc)
         maxmin.append([max,min])
         w += max[0]-min[0]
     
@@ -207,43 +215,18 @@ def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
         except:
             d = dimensions.index([i.h,i.w])
             docs[d] = rotate_dxf(docs[d])
-            msp = docs[d].modelspace()
-            lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
-            min = list(list(lwpolyline[0].vertices())[0])
-            max = list(list(lwpolyline[0].vertices())[0])
-            for line in lwpolyline:
-                for point in list(line.vertices()):
-                    if min[0] > point[0]:
-                        min[0] = point[0]
-                    elif max[0] < point[0]:
-                        max[0] = point[0]
-                        
-                    if min[1] > point[1]:
-                        min[1] = point[1]
-                    elif max[1] < point[1]:
-                        max[1] = point[1]
-            add_doc(docs[d],[i.x,i.y],[max,min])  ### TODO: needs to accomodate rotation by 90 degree for packing
+            maxmin[d] = list(get_dwg_minmaxP(docs[d]))
+
+        add_doc(docs[d],[i.x,i.y],[max,min])
         docs.pop(d)
         maxmin.pop(d)
         dimensions.pop(d)
     
     return packed
 
-def smart_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True):
-    docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
-    docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
-    docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
-
-    singleX = [i for i in docX if count_components(i) == 1]
-    singleY = [i for i in docY if count_components(i) == 1]
-    singleZ = [i for i in docZ if count_components(i) == 1]
-    
-    removedX = [i for i in docX if i not in singleX]
-    removedY = [i for i in docY if i not in singleY]
-    removedZ = [i for i in docZ if i not in singleZ]
 
 
-    return strip_pack_dwg([strip_pack_dwg(singleX,noturn=True),strip_pack_dwg(singleY,noturn=True),strip_pack_dwg(singleZ,noturn=True)],noturn=True)
+# other
 
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
@@ -401,3 +384,4 @@ def count_components(doc: ezdxf.document.Drawing):
     except ezdxf.DXFStructureError:
         print("Error: Invalid or corrupted DXF file.")
         return 0
+

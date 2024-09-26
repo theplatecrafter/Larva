@@ -1,3 +1,4 @@
+import ezdxf.document
 import numpy as np
 from stl import mesh as m
 import math
@@ -302,10 +303,33 @@ def combine_lines(line1: Line, line2: Line, tolerance: float = 1e-6) -> Union[Li
     return False
 
 
+## gided layer slice
+def get_dwg_minmaxP(doc:ezdxf.document.Drawing,outputDimensions:bool = False) -> tuple:
+    msp = doc.modelspace()
+    lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
+    min = list(list(lwpolyline[0].vertices())[0])
+    max = list(list(lwpolyline[0].vertices())[0])
+    for line in lwpolyline:
+        for point in list(line.vertices()):
+            if min[0] > point[0]:
+                min[0] = point[0]
+            elif max[0] < point[0]:
+                max[0] = point[0]
+                
+            if min[1] > point[1]:
+                min[1] = point[1]
+            elif max[1] < point[1]:
+                max[1] = point[1]
+    
+    if outputDimensions:
+        return (max[0]-min[0],max[1]-min[1])
+    else:
+        return (max,min)
+
+
 ## pack
 
 Rectangle = namedtuple('Rectangle', ['x', 'y', 'w', 'h'])
-
 
 def strip_pack(width, rectangles, sorting="width",noturn:bool = False):
     if noturn:
@@ -429,7 +453,6 @@ def recursive_packing(x, y, w, h, D, remaining, indices, result):
             else:
                 recursive_packing(x, y + d, omega, h - d, D, remaining, indices, result)
                 recursive_packing(x + omega, y, w - omega, h, D, remaining, indices, result)
-
 
 def calculate_stl_dimensions(stl_file_path):
     # Load the STL file using trimesh
