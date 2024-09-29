@@ -130,6 +130,7 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
             ])
             msp[-1].dxf.color = 5
             for i in range((1,0),(0,1),(-1,0),(0,-1)):
+                pass #TODO
                 
 
 
@@ -298,7 +299,7 @@ def create_graph(entities):
             graph[tuple(start)].append(tuple(end))
             graph[tuple(end)].append(tuple(start))
         elif entity.dxftype() == 'CIRCLE':
-            # A circle is inherently closed, so we treat it as a single closed part
+
             center = tuple(entity.dxf.center[:2])
             graph[center].append(center)
 
@@ -318,7 +319,6 @@ def extract_loops(graph):
                 if dfs(neighbor, path):
                     return path
             elif neighbor == path[0] and len(path) > 2:
-                # Found a closed loop
                 loops.append(path.copy())
                 return True
 
@@ -334,11 +334,9 @@ def extract_loops(graph):
 
 def is_loop_inside(outer, inner):
     """Check if the inner loop is completely inside the outer loop."""
-    # Extract only the (x, y) coordinates from each point in the loop
     outer_polygon = Polygon([(p[0], p[1]) for p in outer])
     
     for point in inner:
-        # Ensure Point is from shapely.geometry
         if not outer_polygon.contains(Point(point[0], point[1])):
             return False
     return True
@@ -361,22 +359,21 @@ def count_components(doc: ezdxf.document.Drawing):
     Count how many components (distinct loops, ignoring smaller loops inside larger ones) are inside the DXF file.
     """
     try:
-        # Load the DXF file
+
         modelspace = doc.modelspace()
 
         entities = []
-        # Collect relevant entities
+
         for entity in modelspace:
             if entity.dxftype() in ['LWPOLYLINE', 'POLYLINE', 'LINE', 'CIRCLE']:
                 entities.append(entity)
 
-        # Create graph of connected points
         graph = create_graph(entities)
 
-        # Extract closed loops (parts)
+
         loops = extract_loops(graph)
 
-        # Filter out smaller loops inside larger loops
+
         bigger_loops = filter_bigger_loops(loops)
 
         return len(bigger_loops)
