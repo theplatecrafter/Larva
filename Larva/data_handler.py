@@ -61,15 +61,25 @@ def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list
 def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNormal:list = [0,0,1],printDeets:bool = False):
     docList = []
     points = np.unique(input_trimesh.vertices.reshape([-1, 3]), axis=0)
-    slicePlaneNormal = np.array(slicePlaneNormal)
+    slicePlaneNormal = np.array(slicePlaneNormal)/np.linalg.norm(slicePlaneNormal)
     out = find_signed_min_max_distances(points,slicePlaneNormal)
     minPoint = out[0]
     maxPoint = out[2]
-    printIF(printDeets,f"min point:{minPoint} max point:{maxPoint}")
-    a = np.array([maxPoint[i] for i in range(len(maxPoint)) if float(slicePlaneNormal[i]) != 0])
-    i = np.array([minPoint[i] for i in range(len(minPoint)) if float(slicePlaneNormal[i]) != 0])
-    sliceNumbers = math.ceil(np.linalg.norm(a-i)/sliceWidth)
-    slicePlanePoints = [minPoint + (slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*i*sliceWidth+(slicePlaneNormal/np.linalg.norm(slicePlaneNormal))*sliceWidth/2 for i in range(sliceNumbers)]
+    printIF(printDeets,f"min point:{minPoint} max point:{maxPoint}","width_slice_stl")
+    a = []
+    b = []
+    for i in range(len(slicePlaneNormal)):
+        if float(slicePlaneNormal[i]) == 0:
+            a.append(0)
+            b.append(0)
+        else:
+            a.append(maxPoint[i])
+            b.append(minPoint[i])
+    a, b = np.array(a), np.array(b)
+    print(a,b)
+    sliceNumbers = math.ceil(np.linalg.norm(a-b)/sliceWidth)
+    print(slicePlaneNormal*sliceWidth/2)
+    slicePlanePoints = [b + slicePlaneNormal*i*sliceWidth+slicePlaneNormal*sliceWidth/2 for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
         doc = slice_stl(input_trimesh,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets)
         docList.append(doc)
@@ -81,19 +91,18 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 
 # smart slicers
 
-def directional_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True) -> list:
-    docX = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
-    docY = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
-    docZ = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
+def directional_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True,tolerance:float=1e-9) -> list:
+    docX = [combine_lwpolylines(simplify_ezdxf_doc(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
+    docY = [combine_lwpolylines(simplify_ezdxf_doc(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
+    docZ = [combine_lwpolylines(simplify_ezdxf_doc(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
 
-    singleX = [i for i in docX if count_components(i) == 1]
-    singleY = [i for i in docY if count_components(i) == 1]
-    singleZ = [i for i in docZ if count_components(i) == 1]
+    singleX = [i for i in docX if inside_outside_classification(i) == 1]
+    singleY = [i for i in docY if inside_outside_classification(i) == 1]
+    singleZ = [i for i in docZ if inside_outside_classification(i) == 1]
     
     removedX = [i for i in docX if i not in singleX]
     removedY = [i for i in docY if i not in singleY]
     removedZ = [i for i in docZ if i not in singleZ]
-
 
     return singleX + singleY + singleZ ## TODO
 
@@ -228,7 +237,6 @@ def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
 
 
 # other
-
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
     
@@ -279,6 +287,142 @@ def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
             break
 
     return simpDOC
+
+def combine_lwpolylines(drawing, tolerance=1e-8):  ## make this faster
+    modelspace = drawing.modelspace()
+    lwpolylines = list(modelspace.query('LWPOLYLINE'))
+    combined_polylines = []
+    processed = set()
+
+    def are_points_close(p1, p2):
+        return np.linalg.norm(np.array(p1) - np.array(p2)) < tolerance
+
+    def to_vec2(point):
+        if isinstance(point, (tuple, list)) and len(point) >= 2:
+            return Vec2(point[0], point[1])
+        elif hasattr(point, 'x') and hasattr(point, 'y'):
+            return Vec2(point.x, point.y)
+        else:
+            raise ValueError(f"Cannot convert to Vec2: {point}")
+
+    def combine_polylines(start_polyline):
+        combined = list(start_polyline.get_points())
+        current_end = to_vec2(combined[-1])
+        processed.add(start_polyline.dxf.handle)
+        color = start_polyline.dxf.color  # Store the color of the first polyline
+
+        while True:
+            found_next = False
+            for poly in lwpolylines:
+                if poly.dxf.handle in processed:
+                    continue
+
+                points = list(poly.get_points())
+                if are_points_close(current_end, to_vec2(points[0])):
+                    combined.extend(points[1:])
+                    current_end = to_vec2(points[-1])
+                    processed.add(poly.dxf.handle)
+                    found_next = True
+                    break
+                elif are_points_close(current_end, to_vec2(points[-1])):
+                    combined.extend(reversed(points[:-1]))
+                    current_end = to_vec2(points[0])
+                    processed.add(poly.dxf.handle)
+                    found_next = True
+                    break
+
+            if not found_next:
+                break
+
+        return combined, color
+
+    for polyline in lwpolylines:
+        if polyline.dxf.handle in processed:
+            continue
+
+        combined, color = combine_polylines(polyline)
+        
+        # Check if it forms a loop
+        if are_points_close(to_vec2(combined[0]), to_vec2(combined[-1])):
+            # Remove the last point if it's the same as the first
+            combined.pop()
+            combined_polylines.append((combined, color))
+
+    # Remove original polylines
+    for handle in processed:
+        modelspace.delete_entity(drawing.entitydb[handle])
+
+    # Add new combined polylines
+    for points, color in combined_polylines:
+        new_polyline = modelspace.add_lwpolyline(points, dxfattribs={'closed': True, 'color': color})
+
+    return drawing
+
+def inside_outside_classification(drawing):
+    # Extract all closed polylines from the drawing
+    polylines = [entity for entity in drawing.modelspace().query('LWPOLYLINE') if entity.is_closed]
+    
+    # Convert ezdxf polylines to shapely polygons
+    polygons = []
+    for polyline in polylines:
+        # Extract only X and Y coordinates
+        points = [(p[0], p[1]) for p in polyline.get_points()]
+        if len(points) >= 3:  # A polygon needs at least 3 points
+            polygon = Polygon(points)
+            if polygon.is_valid:
+                polygons.append(polygon)
+            else:
+                # If the polygon is invalid, try to fix it
+                polygon = polygon.buffer(0)
+                if isinstance(polygon, Polygon):
+                    polygons.append(polygon)
+                elif isinstance(polygon, MultiPolygon):
+                    polygons.extend(list(polygon.geoms))
+    
+    # Merge overlapping polygons
+    merged_polygons = []
+    while polygons:
+        current = polygons.pop(0)
+        merged = current
+        i = 0
+        while i < len(polygons):
+            if merged.intersects(polygons[i]):
+                merged = merged.union(polygons.pop(i))
+            else:
+                i += 1
+        merged_polygons.append(merged)
+    
+    # Find the bounding box of all polygons
+    if merged_polygons:
+        min_x = min(p.bounds[0] for p in merged_polygons)
+        min_y = min(p.bounds[1] for p in merged_polygons)
+        max_x = max(p.bounds[2] for p in merged_polygons)
+        max_y = max(p.bounds[3] for p in merged_polygons)
+        
+        # Create a grid of points
+        x = np.linspace(min_x, max_x, 100)
+        y = np.linspace(min_y, max_y, 100)
+        xx, yy = np.meshgrid(x, y)
+        
+        # Classify each point
+        inside_regions = set()
+        for i in range(len(xx.flatten())):
+            point = Point(xx.flatten()[i], yy.flatten()[i])
+            for j, polygon in enumerate(merged_polygons):
+                if polygon.contains(point):
+                    inside_regions.add(j)
+                    break
+        
+        # Count the number of separate inside regions
+        num_inside_regions = len(inside_regions)
+    else:
+        num_inside_regions = 0
+    
+    return num_inside_regions
+
+
+
+
 
 def create_graph(entities):
     """Create a graph where points are nodes, and connected entities are edges."""

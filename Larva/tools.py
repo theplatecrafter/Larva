@@ -15,7 +15,7 @@ from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from collections import namedtuple
 from copy import deepcopy
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, MultiPolygon
 
 
 import plotly.graph_objects as go  # numpy-stl
