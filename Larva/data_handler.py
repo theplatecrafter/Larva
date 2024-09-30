@@ -1,6 +1,3 @@
-import ezdxf.document
-import ezdxf.entities
-import ezdxf.entities
 from .tools import *
 from collections import defaultdict
 
@@ -76,9 +73,7 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
             a.append(maxPoint[i])
             b.append(minPoint[i])
     a, b = np.array(a), np.array(b)
-    print(a,b)
     sliceNumbers = math.ceil(np.linalg.norm(a-b)/sliceWidth)
-    print(slicePlaneNormal*sliceWidth/2)
     slicePlanePoints = [b + slicePlaneNormal*i*sliceWidth+slicePlaneNormal*sliceWidth/2 for i in range(sliceNumbers)]
     for i in range(len(slicePlanePoints)):
         doc = slice_stl(input_trimesh,list(slicePlaneNormal),list(slicePlanePoints[i]),printDeets)
