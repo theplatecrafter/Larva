@@ -1,4 +1,6 @@
-from Larva import direct_data_handler as dfm
-path = "data/stl/complex_stl/thankyou_for_listening.stl"
+from Larva import direct_data_handler as dh
+path = "data/dwg/autocad_square2.dxf"
 
-dfm.stl_to_gltf("data/stl/complex_stl/Menger_sponge_sample.stl","output")
+z = dh.ezdxf.readfile(path)
+print(z.dxfversion)
+dh.view_drawing(z,dh.os.path.join(dh.dwg_output_dir,"out.dxf"))

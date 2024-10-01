@@ -371,6 +371,25 @@ def Bs_view_stl(stl_path:str):
 
 
 def view_drawing(doc: ezdxf.document.Drawing, save_path: str = None):
-    doc.saveas(os.path.join(dwg_output_dir,"temp.dxf"))
-    view_dwg(os.path.join(dwg_output_dir,"temp.dxf"),image_output_dir,"temp.png")
+    doc.saveas(os.path.join(dwg_output_dir,"temp.dwg"))
+    view_dwg(os.path.join(dwg_output_dir,"temp.dwg"),image_output_dir,"temp.png")
+
+
+def save_drawing(drawing: ezdxf.document.Drawing, output_directory:str,filename: str = "out", dxf_version: str = 'R12'):
+    """
+    Saves an ezdxf.document.Drawing to a file with the specified DXF version.
+
+    Parameters:
+    drawing (ezdxf.document.Drawing): The DXF document to save.
+    filename (str): The filename where the drawing will be saved (e.g., 'output.dxf').
+    dxf_version (str): The DXF version to save the file as. Supported versions include 'R12', 'R14', 'R2000', etc.
+                       Default is 'R12'.
     
+    Returns:
+    None
+    """
+    # Set the DXF version of the document
+    drawing.dxfversion = dxf_version
+
+    # Save the document to the specified filename
+    drawing.saveas(os.path.join(output_directory,filename+".dwg"))

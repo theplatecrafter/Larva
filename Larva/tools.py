@@ -525,6 +525,8 @@ def translate_entities(entities, translation,printDeets=False):
     printIF(printDeets,f"translated entities to {translation}","translate_entities")
     return new_entities
 
+
+
 ## other
 def rotate(vertices, angles):
     # Convert angles from degrees to radians
@@ -611,3 +613,22 @@ def rotate_dxf(dxf_doc: ezdxf.document.Drawing, angle_deg: float = 90) -> ezdxf.
 
 
     return dxf_doc
+
+def resize_mesh(mesh: trimesh.Trimesh, multiplier: float) -> trimesh.Trimesh:
+    """
+    Resizes the given mesh by a certain multiplier.
+
+    Parameters:
+    mesh (trimesh.Trimesh): The mesh to be resized.
+    multiplier (float): The scaling factor for resizing the mesh.
+
+    Returns:
+    trimesh.Trimesh: The resized mesh.
+    """
+    # Create a scaling matrix
+    scaling_matrix = trimesh.transformations.scale_matrix(multiplier)
+
+    # Apply the scaling transformation to the mesh
+    mesh.apply_transform(scaling_matrix)
+
+    return mesh

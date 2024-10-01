@@ -1,6 +1,12 @@
 from .tools import *
 from collections import defaultdict
 
+## global variable
+output_version = "AC1032"
+
+
+
+
 # global function
 def return_dwg_parts(doc,printDeets:bool = False):
     msp = doc.modelspace()
@@ -12,7 +18,7 @@ def return_dwg_parts(doc,printDeets:bool = False):
     for i, lwpolyline in enumerate(poly):
         j+=1
         printIF(printDeets,f"{j+1}/{len(poly)} entites splitted","return_dwg_parts")
-        tmpdoc = ezdxf.new()
+        tmpdoc = ezdxf.new(output_version)
         tmpmsp = tmpdoc.modelspace()
         
         with lwpolyline.points() as points:
@@ -39,7 +45,7 @@ def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list
         printIF(printDeets,f"No intersection at {slice_normal}, {slice_origin}","slice_3d_stl")
         return
     
-    doc = ezdxf.new()
+    doc = ezdxf.new(output_version)
     msp = doc.modelspace()
 
     slice_2d = slice_3d.to_planar()[0]
@@ -80,7 +86,7 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
         docList.append(doc)
         printIF(printDeets,f"{i+1}/{len(slicePlanePoints)}: sliced mesh with plane point: {slicePlanePoints[i]}","width_slice_stl")
 
-    return docList
+    return [i for i in docList if i]
 
 
 
@@ -121,27 +127,113 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
                 z:zDi
         })
     else:
-        docs = width_slice_stl(input_trimesh,sliceWidth,slicePlaneNormal,printDeets)
+        docs = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,sliceWidth,slicePlaneNormal,printDeets)]
+        max, min = [], []
+        dimX, dimY = 0, 0
         for doc in docs:
-            msp = doc.modelspace()
-            max,min = get_dwg_minmaxP(doc)
-            marg = np.array([sliceWidth+margin,sliceWidth+margin])
+            maxTMP,minTMP = get_dwg_minmaxP(doc)
+            dimXTMP, dimYTMP = get_dwg_minmaxP(doc,True)
+            if dimXTMP > dimX:
+                dimX = dimXTMP
+            if dimYTMP > dimY:
+                dimY = dimYTMP
+            max.append(maxTMP)
+            min.append(minTMP)
+        mx = max[0]
+        mn = min[0]
+        for i in max:
+            if i[0] > mx[0]:
+                mx[0] = i[0]
+            if i[1] > mx[1]:
+                mx[1] = i[1]
+        for i in min:
+            if i[0] > mn[0]:
+                mn[0] = i[0]
+            if i[1] > mn[1]:
+                mn[1] = i[1]
+        
+        for i in range(len(docs)):
+            msp = docs[i].modelspace()
             msp.add_lwpolyline([
-                list(min+(-(sliceWidth+margin),-(sliceWidth+margin)))+[0,0],
-                list((min[0],max[1])+(-(sliceWidth+margin),sliceWidth+margin))+[0,0],
-                list(max+(sliceWidth+margin,sliceWidth+margin))+[0,0],
-                list((max[0],min[1])+(sliceWidth+margin,-(sliceWidth+margin)))+[0,0]
+                [mn[0]-margin-sliceWidth,mn[1]-margin-sliceWidth,0,0],
+                [mn[0]-margin-sliceWidth,mx[1]+margin+sliceWidth,0,0],
+                [mx[0]+margin+sliceWidth,mx[1]+margin+sliceWidth,0,0],
+                [mx[0]+margin+sliceWidth,mn[1]-margin-sliceWidth,0,0]
             ])
             msp[-1].dxf.color = 5
-            for i in range((1,0),(0,1),(-1,0),(0,-1)):
-                pass #TODO
-                
+            
+            start_point = [mn[0]-margin/2-sliceWidth,mn[1]+dimY/2-dimY/4] ## dimY/2, dimX/2
+            msp.add_lwpolyline([
+                start_point+[0,0],
+                [start_point[0],start_point[1]+dimY/2,0,0],
+                [start_point[0]+sliceWidth,start_point[1]+dimY/2,0,0],
+                [start_point[0]+sliceWidth,start_point[1],0,0]
+            ])
+            msp[-1].dxf.color = 5
+            
+            start_point = [mn[0]+dimX/2-dimX/4,mx[1]+margin/2] ## dimY/2, dimX/2
+            msp.add_lwpolyline([
+                start_point+[0,0],
+                [start_point[0]+dimX/2,start_point[1],0,0],
+                [start_point[0]+dimX/2,start_point[1]+sliceWidth,0,0],
+                [start_point[0],start_point[1]+sliceWidth,0,0]
+            ])
+            msp[-1].dxf.color = 5
+            
+            start_point = [mx[0]+margin/2,mn[1]+dimY/2-dimY/4] ## dimY/2, dimX/2
+            msp.add_lwpolyline([
+                start_point+[0,0],
+                [start_point[0],start_point[1]+dimY/2,0,0],
+                [start_point[0]+sliceWidth,start_point[1]+dimY/2,0,0],
+                [start_point[0]+sliceWidth,start_point[1],0,0]
+            ])
+            msp[-1].dxf.color = 5
+            
+            start_point = [mn[0]+dimX/2-dimX/4,mn[1]-margin/2-sliceWidth] ## dimY/2, dimX/2
+            msp.add_lwpolyline([
+                start_point+[0,0],
+                [start_point[0]+dimX/2,start_point[1],0,0],
+                [start_point[0]+dimX/2,start_point[1]+sliceWidth,0,0],
+                [start_point[0],start_point[1]+sliceWidth,0,0]
+            ])
+            msp[-1].dxf.color = 5
+        
+        stablizerX = ezdxf.new(output_version)
+        stablizerXMSP = stablizerX.modelspace()
+        
+        stablizerXMSP.add_lwpolyline([
+            [0,0,0,0],
+            [sliceWidth*(len(docs)+1),0,0,0],
+            [sliceWidth*(len(docs)+1),dimX/2,0,0],
+            [0,dimX/2,0,0]
+        ])
+        stablizerXMSP[-1].dxf.color = 5
+        
+        stablizerY = ezdxf.new(output_version)
+        stablizerYMSP = stablizerY.modelspace()
+        
+        stablizerYMSP.add_lwpolyline([
+            [0,0,0,0],
+            [sliceWidth*(len(docs)+1),0,0,0],
+            [sliceWidth*(len(docs)+1),dimY/2,0,0],
+            [0,dimY/2,0,0]
+        ])
+        stablizerYMSP[-1].dxf.color = 5
+        
+        docs.append(stablizerX)
+        docs.append(stablizerX)
+        docs.append(stablizerY)
+        docs.append(stablizerY)
+        
+        return docs
+
+
 
 
 # dwg packers
 
 def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool = False):
-    packed = ezdxf.new()
+    packed = ezdxf.new(output_version)
     packedMSP = packed.modelspace()
     docs = [i for i in docs if len(i.modelspace()) != 0]
     
@@ -188,7 +280,7 @@ def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool 
     return packed
     
 def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
-    packed = ezdxf.new()
+    packed = ezdxf.new(output_version)
     packedMSP = packed.modelspace()
     docs = [i for i in docs if len(i.modelspace()) != 0]
     
@@ -235,7 +327,7 @@ def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
 def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
     msp = doc.modelspace()
     
-    simpDOC = ezdxf.new()
+    simpDOC = ezdxf.new(output_version)
     simpMSP = simpDOC.modelspace()
 
     def add_lwpolylinez(line):
@@ -276,7 +368,7 @@ def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
 
         if improved:
             msp = simpMSP
-            simpDOC = ezdxf.new()
+            simpDOC = ezdxf.new(output_version)
             simpMSP = simpDOC.modelspace()
         else:
             break
