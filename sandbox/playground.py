@@ -15,4 +15,4 @@ dh.view_dwg(dh.os.path.join(dh.dwg_output_dir,"out.dwg"),dh.image_output_dir)
 
 exit()
 
-## TODO: maybe change lwpolyline to polyline?
+## TODO: maybe change lwpolyline to polyline? for corel draw
