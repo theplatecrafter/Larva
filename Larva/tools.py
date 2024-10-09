@@ -15,7 +15,8 @@ from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from collections import namedtuple
 from copy import deepcopy
-from shapely.geometry import Polygon, Point, MultiPolygon
+from shapely.geometry import Polygon, Point, MultiPolygon, LineString, GeometryCollection
+from shapely.ops import unary_union
 
 
 import plotly.graph_objects as go  # numpy-stl
@@ -25,6 +26,9 @@ from skimage.measure import label
 from moviepy.editor import ImageSequenceClip
 import xlsxwriter as xlsw
 from matplotlib.colors import hsv_to_rgb
+
+
+
 
 
 from .read_terminal import *

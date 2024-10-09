@@ -5,9 +5,11 @@ tri = dh.resize_mesh(dh.trimesh.load_mesh(path),1)
 
 dh.clear_output_paths()
 
+v = dh.slice_stl(tri,[0,0,1],[0,0,5])
+dh.view_drawing(v)
+print(dh.count_inside_parts(v))
 
-dh.view_drawing(dh.slice_stl(tri,[0,0,1],[0,0,5]))
-
+exit()
 
 out = dh.gided_layer_slice_stl(tri,4,[0,0,1])
 d = dh.grid_pack_dwg(out)

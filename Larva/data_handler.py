@@ -93,13 +93,13 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 # smart slicers
 
 def directional_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True,tolerance:float=1e-9) -> list:
-    docX = [combine_lwpolylines(simplify_drawing(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
-    docY = [combine_lwpolylines(simplify_drawing(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
-    docZ = [combine_lwpolylines(simplify_drawing(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
+    docX = [simplify_drawing(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
+    docY = [simplify_drawing(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
+    docZ = [simplify_drawing(i) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
 
-    singleX = [i for i in docX if inside_outside_classification(i) == 1]
-    singleY = [i for i in docY if inside_outside_classification(i) == 1]
-    singleZ = [i for i in docZ if inside_outside_classification(i) == 1]
+    singleX = [i for i in docX if count_inside_parts(i) == 1]
+    singleY = [i for i in docY if count_inside_parts(i) == 1]
+    singleZ = [i for i in docZ if count_inside_parts(i) == 1]
     
     removedX = [i for i in docX if i not in singleX]
     removedY = [i for i in docY if i not in singleY]
@@ -380,6 +380,58 @@ def simplify_drawing(doc: ezdxf.document.Drawing) -> ezdxf.document.Drawing: ##T
     
     return packed
 
+def count_inside_parts(doc: ezdxf.document.Drawing) -> int:
+    """Counts the number of separated 'inside' parts in a DXF drawing."""
+    
+    def extract_closed_loops(doc: ezdxf.document.Drawing):
+        """Extracts all closed loops (polygons) from the DXF drawing's LINE entities."""
+        lines = [(line.dxf.start, line.dxf.end) for line in doc.modelspace() if line.dxftype() == "LINE"]
+        # Convert Vec3 to tuples to access (x, y) coordinates
+        line_strings = [LineString([(start.x, start.y), (end.x, end.y)]) for start, end in lines]
+        
+        # Union of all lines to combine into connected segments
+        combined_lines = unary_union(line_strings)
+        
+        # Extract closed loops (as Polygons)
+        polygons = []
+        
+        # Handle MultiLineString or GeometryCollection
+        if isinstance(combined_lines, GeometryCollection):
+            for geom in combined_lines:
+                if isinstance(geom, LineString) and geom.is_ring:
+                    polygons.append(Polygon(geom))
+        elif isinstance(combined_lines, LineString):
+            if combined_lines.is_ring:
+                polygons.append(Polygon(combined_lines))
+        elif isinstance(combined_lines, list):
+            for geom in combined_lines:
+                if geom.is_ring:
+                    polygons.append(Polygon(geom))
+
+        return polygons
+
+    def is_polygon_inside(polygon1, polygon2):
+        """Check if polygon1 is completely inside polygon2."""
+        return polygon2.contains(polygon1)
+    
+    # Extract polygons (closed loops) from the DXF drawing
+    polygons = extract_closed_loops(doc)
+    inside_count = 0
+    
+    # Check each polygon against every other to see if it is inside
+    for i, poly1 in enumerate(polygons):
+        is_inside = False
+        for j, poly2 in enumerate(polygons):
+            if i != j and is_polygon_inside(poly1, poly2):
+                is_inside = True
+                break
+        if is_inside:
+            inside_count += 1
+    
+    return inside_count
+
+
+
 def combine_lwpolylines(drawing, tolerance=1e-8):  ## make this faster
     modelspace = drawing.modelspace()
     lwpolylines = list(modelspace.query('LWPOLYLINE'))
@@ -511,10 +563,6 @@ def inside_outside_classification(drawing):
         num_inside_regions = 0
     
     return num_inside_regions
-
-
-
-
 
 def create_graph(entities):
     """Create a graph where points are nodes, and connected entities are edges."""
