@@ -304,27 +304,34 @@ def combine_lines(line1: Line, line2: Line, tolerance: float = 1e-6) -> Union[Li
 
 
 ## gided layer slice
-def get_dwg_minmaxP(doc:ezdxf.document.Drawing,outputDimensions:bool = False) -> tuple:
+def get_dwg_minmaxP(doc: ezdxf.document.Drawing, outputDimensions: bool = False) -> tuple:
     msp = doc.modelspace()
-    lwpolyline = [i for i in msp if i.dxftype() == "LWPOLYLINE"]
-    min = list(list(lwpolyline[0].vertices())[0])
-    max = list(list(lwpolyline[0].vertices())[0])
-    for line in lwpolyline:
-        for point in list(line.vertices()):
-            if min[0] > point[0]:
-                min[0] = point[0]
-            elif max[0] < point[0]:
-                max[0] = point[0]
+    lines = [i for i in msp if i.dxftype() == "LINE"]
+    
+    if not lines:
+        return ((0, 0), (0, 0)) if not outputDimensions else (0, 0)
+    
+    # Initialize min and max with the start point of the first LINE
+    min = [lines[0].dxf.start.x, lines[0].dxf.start.y]
+    max = [lines[0].dxf.start.x, lines[0].dxf.start.y]
+    
+    # Iterate over the LINE entities
+    for line in lines:
+        for point in [line.dxf.start, line.dxf.end]:
+            if min[0] > point.x:
+                min[0] = point.x
+            elif max[0] < point.x:
+                max[0] = point.x
                 
-            if min[1] > point[1]:
-                min[1] = point[1]
-            elif max[1] < point[1]:
-                max[1] = point[1]
+            if min[1] > point.y:
+                min[1] = point.y
+            elif max[1] < point.y:
+                max[1] = point.y
     
     if outputDimensions:
-        return (max[0]-min[0],max[1]-min[1])
+        return (max[0] - min[0], max[1] - min[1])
     else:
-        return (max,min)
+        return (max, min)
 
 
 ## pack

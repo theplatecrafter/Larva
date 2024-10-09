@@ -55,7 +55,7 @@ def slice_stl(input_trimesh:trimesh.Trimesh, slice_normal:list,slice_origin:list
     for entity in slice_2d.entities:
         for decomposed in entity.explode():
             line = decomposed.bounds(slice_2d.vertices)
-            msp.add_lwpolyline([list(line[0]) + list(line[0]),list(line[1]) + list(line[1])])
+            msp.add_line((line[0]),list(line[1]))
             msp[-1].dxf.color = 5
             printIF(printDeets,f"{decomposed} has line data: {decomposed.bounds(slice_2d.vertices)}","slice_3d_stl")
 
@@ -93,9 +93,9 @@ def width_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNor
 # smart slicers
 
 def directional_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:float = 1,noturn:bool = False,printDeets:bool = True,tolerance:float=1e-9) -> list:
-    docX = [combine_lwpolylines(simplify_ezdxf_doc(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
-    docY = [combine_lwpolylines(simplify_ezdxf_doc(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
-    docZ = [combine_lwpolylines(simplify_ezdxf_doc(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
+    docX = [combine_lwpolylines(simplify_drawing(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[1,0,0],printDeets)]
+    docY = [combine_lwpolylines(simplify_drawing(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,1,0],printDeets)]
+    docZ = [combine_lwpolylines(simplify_drawing(i),tolerance) for i in width_slice_stl(input_trimesh,processingDimentionSize,[0,0,1],printDeets)]
 
     singleX = [i for i in docX if inside_outside_classification(i) == 1]
     singleY = [i for i in docY if inside_outside_classification(i) == 1]
@@ -127,7 +127,7 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
                 z:zDi
         })
     else:
-        docs = [simplify_ezdxf_doc(i) for i in width_slice_stl(input_trimesh,sliceWidth,slicePlaneNormal,printDeets)]
+        docs = [simplify_drawing(i) for i in width_slice_stl(input_trimesh,sliceWidth,slicePlaneNormal,printDeets)]
         max, min = [], []
         dimX, dimY = 0, 0
         for doc in docs:
@@ -154,70 +154,77 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
         
         for i in range(len(docs)):
             msp = docs[i].modelspace()
-            msp.add_lwpolyline([
-                [mn[0]-margin-sliceWidth,mn[1]-margin-sliceWidth,0,0],
-                [mn[0]-margin-sliceWidth,mx[1]+margin+sliceWidth,0,0],
-                [mx[0]+margin+sliceWidth,mx[1]+margin+sliceWidth,0,0],
-                [mx[0]+margin+sliceWidth,mn[1]-margin-sliceWidth,0,0]
-            ])
+            msp.add_line(mn[0]-margin-sliceWidth,mn[1]-margin-sliceWidth)
+            msp[-1].dxf.color = 5
+            msp.add_line(mn[0]-margin-sliceWidth,mx[1]+margin+sliceWidth)
+            msp[-1].dxf.color = 5
+            msp.add_line(mx[0]+margin+sliceWidth,mx[1]+margin+sliceWidth)
+            msp[-1].dxf.color = 5
+            msp.add_line(mx[0]+margin+sliceWidth,mn[1]-margin-sliceWidth)
             msp[-1].dxf.color = 5
             
             start_point = [mn[0]-margin/2-sliceWidth,mn[1]+dimY/2-dimY/4] ## dimY/2, dimX/2
-            msp.add_lwpolyline([
-                start_point+[0,0],
-                [start_point[0],start_point[1]+dimY/2,0,0],
-                [start_point[0]+sliceWidth,start_point[1]+dimY/2,0,0],
-                [start_point[0]+sliceWidth,start_point[1],0,0]
-            ])
+            msp.add_line(start_point)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0],start_point[1]+dimY/2)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+sliceWidth,start_point[1]+dimY/2)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+sliceWidth,start_point[1])
             msp[-1].dxf.color = 5
             
             start_point = [mn[0]+dimX/2-dimX/4,mx[1]+margin/2] ## dimY/2, dimX/2
-            msp.add_lwpolyline([
-                start_point+[0,0],
-                [start_point[0]+dimX/2,start_point[1],0,0],
-                [start_point[0]+dimX/2,start_point[1]+sliceWidth,0,0],
-                [start_point[0],start_point[1]+sliceWidth,0,0]
-            ])
+            msp.add_line(start_point)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+dimX/2,start_point[1])
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+dimX/2,start_point[1]+sliceWidth)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0],start_point[1]+sliceWidth)
             msp[-1].dxf.color = 5
             
             start_point = [mx[0]+margin/2,mn[1]+dimY/2-dimY/4] ## dimY/2, dimX/2
-            msp.add_lwpolyline([
-                start_point+[0,0],
-                [start_point[0],start_point[1]+dimY/2,0,0],
-                [start_point[0]+sliceWidth,start_point[1]+dimY/2,0,0],
-                [start_point[0]+sliceWidth,start_point[1],0,0]
-            ])
+            msp.add_line(start_point)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0],start_point[1]+dimY/2)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+sliceWidth,start_point[1]+dimY/2)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+sliceWidth,start_point[1])
             msp[-1].dxf.color = 5
             
             start_point = [mn[0]+dimX/2-dimX/4,mn[1]-margin/2-sliceWidth] ## dimY/2, dimX/2
-            msp.add_lwpolyline([
-                start_point+[0,0],
-                [start_point[0]+dimX/2,start_point[1],0,0],
-                [start_point[0]+dimX/2,start_point[1]+sliceWidth,0,0],
-                [start_point[0],start_point[1]+sliceWidth,0,0]
-            ])
+            msp.add_line(start_point)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+dimX/2,start_point[1])
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0]+dimX/2,start_point[1]+sliceWidth)
+            msp[-1].dxf.color = 5
+            msp.add_line(start_point[0],start_point[1]+sliceWidth)
             msp[-1].dxf.color = 5
         
         stablizerX = ezdxf.new(output_version)
         stablizerXMSP = stablizerX.modelspace()
         
-        stablizerXMSP.add_lwpolyline([
-            [0,0,0,0],
-            [sliceWidth*(len(docs)+1),0,0,0],
-            [sliceWidth*(len(docs)+1),dimX/2,0,0],
-            [0,dimX/2,0,0]
-        ])
+        stablizerXMSP.add_line(0,0)
+        stablizerXMSP[-1].dxf.color = 5
+        stablizerXMSP.add_line(sliceWidth*(len(docs)+1),0)
+        stablizerXMSP[-1].dxf.color = 5
+        stablizerXMSP.add_line(sliceWidth*(len(docs)+1),dimX/2)
+        stablizerXMSP[-1].dxf.color = 5
+        stablizerXMSP.add_line(0,dimX/2)
         stablizerXMSP[-1].dxf.color = 5
         
         stablizerY = ezdxf.new(output_version)
         stablizerYMSP = stablizerY.modelspace()
         
-        stablizerYMSP.add_lwpolyline([
-            [0,0,0,0],
-            [sliceWidth*(len(docs)+1),0,0,0],
-            [sliceWidth*(len(docs)+1),dimY/2,0,0],
-            [0,dimY/2,0,0]
-        ])
+        stablizerYMSP.add_line(0,0)
+        stablizerYMSP[-1].dxf.color = 5
+        stablizerYMSP.add_line(sliceWidth*(len(docs)+1),0)
+        stablizerYMSP[-1].dxf.color = 5
+        stablizerYMSP.add_line(sliceWidth*(len(docs)+1),dimY/2)
+        stablizerYMSP[-1].dxf.color = 5
+        stablizerYMSP.add_line(0,dimY/2)
         stablizerYMSP[-1].dxf.color = 5
         
         docs.append(stablizerX)
@@ -232,20 +239,22 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
 
 # dwg packers
 
-def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool = False):
+def grid_pack_dwg(docs: list, Xcount: int = None, margin: float = 1, addGridLine: bool = False):
     packed = ezdxf.new(output_version)
     packedMSP = packed.modelspace()
     docs = [i for i in docs if len(i.modelspace()) != 0]
     
-    
     if not Xcount:
         Xcount = math.ceil(math.sqrt(len(docs)))
     
-    def add_doc(doc,pos,dim):
+    def add_doc(doc, pos, dim):
         msp = doc.modelspace()
-        corner = [dim[1][0],dim[0][1]]
-        for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]:
-            packedMSP.add_lwpolyline(i.translate(pos[0]-corner[0],pos[1]-corner[1],0))
+        corner = [dim[1][0], dim[0][1]]
+        for i in [entity for entity in msp if entity.dxftype() == "LINE"]:
+            packedMSP.add_line(
+                (i.dxf.start.x + pos[0] - corner[0], i.dxf.start.y + pos[1] - corner[1]),
+                (i.dxf.end.x + pos[0] - corner[0], i.dxf.end.y + pos[1] - corner[1])
+            )
             packedMSP[-1].dxf.color = i.dxf.color
     
     x = 0
@@ -253,68 +262,69 @@ def grid_pack_dwg(docs:list,Xcount:int = None,margin:float = 1,addGridLine:bool 
     y = 0
     maxY = 0
     for doc in docs:
-        m+=1
-        max,min = get_dwg_minmaxP(doc)
-        if max[1]-min[1] > maxY:
-            maxY = max[1]-min[1]
+        m += 1
+        max, min = get_dwg_minmaxP(doc)
+        if max[1] - min[1] > maxY:
+            maxY = max[1] - min[1]
 
-
-        add_doc(doc,(x,y),(max,min))
+        add_doc(doc, (x, y), (max, min))
         if m == Xcount:
-            y-=maxY+margin
+            y -= maxY + margin
             if addGridLine:
-                packedMSP.add_lwpolyline([(margin*-1/2,y+margin/2,0,0),(x+max[0]-min[0]+margin/2,y+margin/2,0,0)])
+                packedMSP.add_line((margin * -1 / 2, y + margin / 2),(x + max[0] - min[0] + margin / 2, y + margin / 2))
                 packedMSP[-1].dxf.color = 1
             x = 0
             m = 0
             maxY = 0
         else:
-            x+=max[0]-min[0]+margin
+            x += max[0] - min[0] + margin
             if addGridLine:
-                packedMSP.add_lwpolyline([(x-margin/2,y+margin/2,0,0),(x-margin/2,y-max[1]+min[1]-margin/2,0,0)])
+                packedMSP.add_line((x - margin / 2, y + margin / 2),(x - margin / 2, y - max[1] + min[1] - margin / 2))
                 packedMSP[-1].dxf.color = 1
                 
     if addGridLine:
         packedMSP.delete_entity(packedMSP[-1])
-            
+    
     return packed
     
-def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
+def strip_pack_dwg(docs: list, width=None, noturn: bool = False):
     packed = ezdxf.new(output_version)
     packedMSP = packed.modelspace()
     docs = [i for i in docs if len(i.modelspace()) != 0]
     
-    def add_doc(doc,pos,dim):
+    def add_doc(doc, pos, dim):
         msp = doc.modelspace()
-        corner = [dim[1][0],dim[0][1]]
-        for i in [entity for entity in msp if entity.dxftype() == "LWPOLYLINE"]:
-            packedMSP.add_lwpolyline(i.translate(pos[0]-corner[0],pos[1]-corner[1],0))
+        corner = [dim[1][0], dim[0][1]]
+        for i in [entity for entity in msp if entity.dxftype() == "LINE"]:
+            packedMSP.add_line(
+                (i.dxf.start.x + pos[0] - corner[0], i.dxf.start.y + pos[1] - corner[1]),
+                (i.dxf.end.x + pos[0] - corner[0], i.dxf.end.y + pos[1] - corner[1])
+            )
             packedMSP[-1].dxf.color = i.dxf.color
-    
     
     w = 0
     maxmin = []
     for doc in docs:
-        max,min = get_dwg_minmaxP(doc)
-        maxmin.append([max,min])
-        w += max[0]-min[0]
+        max, min = get_dwg_minmaxP(doc)
+        maxmin.append([max, min])
+        w += max[0] - min[0]
     
     if not width:
-        width = w/2
+        width = w / 2
     
-    dimensions = [[i[0][0]-i[1][0],i[0][1]-i[1][1]] for i in maxmin]
+    dimensions = [[i[0][0] - i[1][0], i[0][1] - i[1][1]] for i in maxmin]
     
-    height, out = strip_pack(width,dimensions,noturn=noturn)
+    height, out = strip_pack(width, dimensions, noturn=noturn)
     for i in out:
         try:
-            d = dimensions.index([i.w,i.h])
-            add_doc(docs[d],[i.x,i.y],maxmin[d])
+            d = dimensions.index([i.w, i.h])
+            add_doc(docs[d], [i.x, i.y], maxmin[d])
         except:
-            d = dimensions.index([i.h,i.w])
+            d = dimensions.index([i.h, i.w])
             docs[d] = rotate_dxf(docs[d])
             maxmin[d] = list(get_dwg_minmaxP(docs[d]))
 
-        add_doc(docs[d],[i.x,i.y],[max,min])
+        add_doc(docs[d], [i.x, i.y], maxmin[d])
         docs.pop(d)
         maxmin.pop(d)
         dimensions.pop(d)
@@ -324,56 +334,51 @@ def strip_pack_dwg(docs:list,width = None,noturn:bool = False):
 
 
 # other
-def simplify_ezdxf_doc(doc: ezdxf.document.Drawing):
-    msp = doc.modelspace()
+def simplify_drawing(doc: ezdxf.document.Drawing) -> ezdxf.document.Drawing: ##TODO: check if this work
+    def are_collinear(line1, line2):
+        """Check if two lines are collinear by comparing their direction vectors."""
+        vec1 = (line1[1][0] - line1[0][0], line1[1][1] - line1[0][1])
+        vec2 = (line2[1][0] - line2[0][0], line2[1][1] - line2[0][1])
+        return vec1[0] * vec2[1] == vec1[1] * vec2[0]
+
+    def overlap_or_connect(line1, line2):
+        """Check if two collinear lines overlap or connect directly."""
+        points = sorted([line1[0], line1[1], line2[0], line2[1]], key=lambda p: (p[0], p[1]))
+        return points[1] == points[2] or points[1][0] <= points[2][0] and points[0][0] <= points[3][0]
+
+    def merge_lines(line1, line2):
+        """Merge two collinear, overlapping/connecting lines into one."""
+        return [min(line1[0], line1[1], line2[0], line2[1], key=lambda p: (p[0], p[1])),
+                max(line1[0], line1[1], line2[0], line2[1], key=lambda p: (p[0], p[1]))]
+
+    packed = ezdxf.new(doc.dxfversion)
+    packedMSP = packed.modelspace()
+    lines = [(line.dxf.start, line.dxf.end) for line in doc.modelspace() if line.dxftype() == "LINE"]
     
-    simpDOC = ezdxf.new(output_version)
-    simpMSP = simpDOC.modelspace()
-
-    def add_lwpolylinez(line):
-        simpMSP.add_lwpolyline([list(line[0]) + list(line[0]), list(line[1]) + list(line[1])])
-        simpMSP[-1].dxf.color = 5
-
-    improved = True
-    while improved:
-        lines = [tuple(e.vertices()) for e in msp if e.dxftype() == "LWPOLYLINE"]
-        connectivityLINES = create_line_connectivity_map(lines)
-        processed_lines = set()
-        improved = False
+    if not lines:
+        return packed
+    
+    merged_lines = []
+    
+    for line in lines:
+        line = sorted(line, key=lambda p: (p[0], p[1]))  # Sort start and end for consistency
+        merged = False
         
-        for line in lines:
-            if line in processed_lines:
-                continue
-
-            try:
-                connected_lines = [l for l in get_connected_lines(line, connectivityLINES) if l not in processed_lines]
-            except IndexError:
-                connected_lines = []
-
-            if connected_lines:
-                for connected_line in connected_lines:
-                    combined_line = combine_lines(line, connected_line, 0)
-                    if combined_line:
-                        add_lwpolylinez(combined_line)
-                        processed_lines.add(line)
-                        processed_lines.add(connected_line)
-                        improved = True
-                        break
-                else:
-                    add_lwpolylinez(line)
-                    processed_lines.add(line)
-            else:
-                add_lwpolylinez(line)
-                processed_lines.add(line)
-
-        if improved:
-            msp = simpMSP
-            simpDOC = ezdxf.new(output_version)
-            simpMSP = simpDOC.modelspace()
-        else:
-            break
-
-    return simpDOC
+        # Try to merge with existing lines
+        for i, merged_line in enumerate(merged_lines):
+            if are_collinear(merged_line, line) and overlap_or_connect(merged_line, line):
+                merged_lines[i] = merge_lines(merged_line, line)
+                merged = True
+                break
+        
+        if not merged:
+            merged_lines.append(line)
+    
+    # Add merged lines to new DXF document
+    for line in merged_lines:
+        packedMSP.add_line(line[0], line[1])
+    
+    return packed
 
 def combine_lwpolylines(drawing, tolerance=1e-8):  ## make this faster
     modelspace = drawing.modelspace()
