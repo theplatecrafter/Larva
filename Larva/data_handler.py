@@ -154,77 +154,86 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
         
         for i in range(len(docs)):
             msp = docs[i].modelspace()
-            msp.add_line(mn[0]-margin-sliceWidth,mn[1]-margin-sliceWidth)
+            # Adding first rectangular boundary
+            msp.add_line([mn[0] - margin - sliceWidth, mn[1] - margin - sliceWidth], [mn[0] - margin - sliceWidth, mx[1] + margin + sliceWidth])
+            msp.add_line([mn[0] - margin - sliceWidth, mx[1] + margin + sliceWidth], [mx[0] + margin + sliceWidth, mx[1] + margin + sliceWidth])
+            msp.add_line([mx[0] + margin + sliceWidth, mx[1] + margin + sliceWidth], [mx[0] + margin + sliceWidth, mn[1] - margin - sliceWidth])
+            msp.add_line([mx[0] + margin + sliceWidth, mn[1] - margin - sliceWidth], [mn[0] - margin - sliceWidth, mn[1] - margin - sliceWidth])
+            msp[-4].dxf.color = 5
+            msp[-3].dxf.color = 5
+            msp[-2].dxf.color = 5
             msp[-1].dxf.color = 5
-            msp.add_line(mn[0]-margin-sliceWidth,mx[1]+margin+sliceWidth)
+
+            # Adding the first inner rectangle
+            start_point = [mn[0] - margin / 2 - sliceWidth, mn[1] + dimY / 2 - dimY / 4]
+            msp.add_line(start_point, [start_point[0], start_point[1] + dimY / 2])
+            msp.add_line([start_point[0], start_point[1] + dimY / 2], [start_point[0] + sliceWidth, start_point[1] + dimY / 2])
+            msp.add_line([start_point[0] + sliceWidth, start_point[1] + dimY / 2], [start_point[0] + sliceWidth, start_point[1]])
+            msp.add_line([start_point[0] + sliceWidth, start_point[1]], start_point)
+            msp[-4].dxf.color = 5
+            msp[-3].dxf.color = 5
+            msp[-2].dxf.color = 5
             msp[-1].dxf.color = 5
-            msp.add_line(mx[0]+margin+sliceWidth,mx[1]+margin+sliceWidth)
+
+            # Adding the second inner rectangle
+            start_point = [mn[0] + dimX / 2 - dimX / 4, mx[1] + margin / 2]
+            msp.add_line(start_point, [start_point[0] + dimX / 2, start_point[1]])
+            msp.add_line([start_point[0] + dimX / 2, start_point[1]], [start_point[0] + dimX / 2, start_point[1] + sliceWidth])
+            msp.add_line([start_point[0] + dimX / 2, start_point[1] + sliceWidth], [start_point[0], start_point[1] + sliceWidth])
+            msp.add_line([start_point[0], start_point[1] + sliceWidth], start_point)
+            msp[-4].dxf.color = 5
+            msp[-3].dxf.color = 5
+            msp[-2].dxf.color = 5
             msp[-1].dxf.color = 5
-            msp.add_line(mx[0]+margin+sliceWidth,mn[1]-margin-sliceWidth)
+
+            # Adding the third inner rectangle
+            start_point = [mx[0] + margin / 2, mn[1] + dimY / 2 - dimY / 4]
+            msp.add_line(start_point, [start_point[0], start_point[1] + dimY / 2])
+            msp.add_line([start_point[0], start_point[1] + dimY / 2], [start_point[0] + sliceWidth, start_point[1] + dimY / 2])
+            msp.add_line([start_point[0] + sliceWidth, start_point[1] + dimY / 2], [start_point[0] + sliceWidth, start_point[1]])
+            msp.add_line([start_point[0] + sliceWidth, start_point[1]], start_point)
+            msp[-4].dxf.color = 5
+            msp[-3].dxf.color = 5
+            msp[-2].dxf.color = 5
             msp[-1].dxf.color = 5
-            
-            start_point = [mn[0]-margin/2-sliceWidth,mn[1]+dimY/2-dimY/4] ## dimY/2, dimX/2
-            msp.add_line(start_point)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0],start_point[1]+dimY/2)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+sliceWidth,start_point[1]+dimY/2)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+sliceWidth,start_point[1])
-            msp[-1].dxf.color = 5
-            
-            start_point = [mn[0]+dimX/2-dimX/4,mx[1]+margin/2] ## dimY/2, dimX/2
-            msp.add_line(start_point)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+dimX/2,start_point[1])
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+dimX/2,start_point[1]+sliceWidth)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0],start_point[1]+sliceWidth)
-            msp[-1].dxf.color = 5
-            
-            start_point = [mx[0]+margin/2,mn[1]+dimY/2-dimY/4] ## dimY/2, dimX/2
-            msp.add_line(start_point)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0],start_point[1]+dimY/2)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+sliceWidth,start_point[1]+dimY/2)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+sliceWidth,start_point[1])
-            msp[-1].dxf.color = 5
-            
-            start_point = [mn[0]+dimX/2-dimX/4,mn[1]-margin/2-sliceWidth] ## dimY/2, dimX/2
-            msp.add_line(start_point)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+dimX/2,start_point[1])
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0]+dimX/2,start_point[1]+sliceWidth)
-            msp[-1].dxf.color = 5
-            msp.add_line(start_point[0],start_point[1]+sliceWidth)
+
+            # Adding the fourth inner rectangle
+            start_point = [mn[0] + dimX / 2 - dimX / 4, mn[1] - margin / 2 - sliceWidth]
+            msp.add_line(start_point, [start_point[0] + dimX / 2, start_point[1]])
+            msp.add_line([start_point[0] + dimX / 2, start_point[1]], [start_point[0] + dimX / 2, start_point[1] + sliceWidth])
+            msp.add_line([start_point[0] + dimX / 2, start_point[1] + sliceWidth], [start_point[0], start_point[1] + sliceWidth])
+            msp.add_line([start_point[0], start_point[1] + sliceWidth], start_point)
+            msp[-4].dxf.color = 5
+            msp[-3].dxf.color = 5
+            msp[-2].dxf.color = 5
             msp[-1].dxf.color = 5
         
+        # Create stablizerX
         stablizerX = ezdxf.new(output_version)
         stablizerXMSP = stablizerX.modelspace()
-        
-        stablizerXMSP.add_line(0,0)
+
+        # Add four lines instead of lwpolyline for stablizerX
+        stablizerXMSP.add_line([0, 0], [sliceWidth * (len(docs) + 1), 0])
+        stablizerXMSP.add_line([sliceWidth * (len(docs) + 1), 0], [sliceWidth * (len(docs) + 1), dimX / 2])
+        stablizerXMSP.add_line([sliceWidth * (len(docs) + 1), dimX / 2], [0, dimX / 2])
+        stablizerXMSP.add_line([0, dimX / 2], [0, 0])
+        stablizerXMSP[-4].dxf.color = 5
+        stablizerXMSP[-3].dxf.color = 5
+        stablizerXMSP[-2].dxf.color = 5
         stablizerXMSP[-1].dxf.color = 5
-        stablizerXMSP.add_line(sliceWidth*(len(docs)+1),0)
-        stablizerXMSP[-1].dxf.color = 5
-        stablizerXMSP.add_line(sliceWidth*(len(docs)+1),dimX/2)
-        stablizerXMSP[-1].dxf.color = 5
-        stablizerXMSP.add_line(0,dimX/2)
-        stablizerXMSP[-1].dxf.color = 5
-        
+
+        # Create stablizerY
         stablizerY = ezdxf.new(output_version)
         stablizerYMSP = stablizerY.modelspace()
-        
-        stablizerYMSP.add_line(0,0)
-        stablizerYMSP[-1].dxf.color = 5
-        stablizerYMSP.add_line(sliceWidth*(len(docs)+1),0)
-        stablizerYMSP[-1].dxf.color = 5
-        stablizerYMSP.add_line(sliceWidth*(len(docs)+1),dimY/2)
-        stablizerYMSP[-1].dxf.color = 5
-        stablizerYMSP.add_line(0,dimY/2)
+
+        # Add four lines instead of lwpolyline for stablizerY
+        stablizerYMSP.add_line([0, 0], [sliceWidth * (len(docs) + 1), 0])
+        stablizerYMSP.add_line([sliceWidth * (len(docs) + 1), 0], [sliceWidth * (len(docs) + 1), dimY / 2])
+        stablizerYMSP.add_line([sliceWidth * (len(docs) + 1), dimY / 2], [0, dimY / 2])
+        stablizerYMSP.add_line([0, dimY / 2], [0, 0])
+        stablizerYMSP[-4].dxf.color = 5
+        stablizerYMSP[-3].dxf.color = 5
+        stablizerYMSP[-2].dxf.color = 5
         stablizerYMSP[-1].dxf.color = 5
         
         docs.append(stablizerX)
@@ -233,6 +242,7 @@ def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePl
         docs.append(stablizerY)
         
         return docs
+
 
 
 
@@ -334,7 +344,7 @@ def strip_pack_dwg(docs: list, width=None, noturn: bool = False):
 
 
 # other
-def simplify_drawing(doc: ezdxf.document.Drawing) -> ezdxf.document.Drawing: ##TODO: check if this work
+def simplify_drawing(doc: ezdxf.document.Drawing) -> ezdxf.document.Drawing: ##TODO: check if this work #TODO: nop, darn it
     def are_collinear(line1, line2):
         """Check if two lines are collinear by comparing their direction vectors."""
         vec1 = (line1[1][0] - line1[0][0], line1[1][1] - line1[0][1])
@@ -380,7 +390,7 @@ def simplify_drawing(doc: ezdxf.document.Drawing) -> ezdxf.document.Drawing: ##T
     
     return packed
 
-def count_inside_parts(doc: ezdxf.document.Drawing) -> int:
+def count_inside_parts(doc: ezdxf.document.Drawing) -> int: ## TODO: does not work
     """Counts the number of separated 'inside' parts in a DXF drawing."""
     
     def extract_closed_loops(doc: ezdxf.document.Drawing):
@@ -410,27 +420,13 @@ def count_inside_parts(doc: ezdxf.document.Drawing) -> int:
 
         return polygons
 
-    def is_polygon_inside(polygon1, polygon2):
-        """Check if polygon1 is completely inside polygon2."""
-        return polygon2.contains(polygon1)
-    
     # Extract polygons (closed loops) from the DXF drawing
     polygons = extract_closed_loops(doc)
-    inside_count = 0
     
-    # Check each polygon against every other to see if it is inside
-    for i, poly1 in enumerate(polygons):
-        is_inside = False
-        for j, poly2 in enumerate(polygons):
-            if i != j and is_polygon_inside(poly1, poly2):
-                is_inside = True
-                break
-        if is_inside:
-            inside_count += 1
+    # Instead of checking if one polygon is inside another, just return the number of distinct polygons
+    inside_count = len(polygons)
     
     return inside_count
-
-
 
 def combine_lwpolylines(drawing, tolerance=1e-8):  ## make this faster
     modelspace = drawing.modelspace()
