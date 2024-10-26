@@ -14,4 +14,4 @@ https://cocoatomo.github.io/poetry-ja/
 
 
 ## LUALCADの動作
-最初に .../Larva ディレクトリに入る。次にjupyter notebook が開けるアプリで RUNTHIS.ipynb を開く（vscode等で）ファイル中の指示に従う。
+最初に .../Larva ディレクトリに入る。次にjupyter notebook が開けるアプリで Larva/RUNTHIS.ipynb を開く（vscode等で）ファイル中の指示に従う。
