@@ -25,8 +25,6 @@ def clear_output_paths():
 
 
 ## global functions
-def DEVremoveUnneededlines(path_to_dwg:str,output_path:str,triangleErrorRange:float = 0,output_name:str="fixed_dwg",printDeets:bool = True):
-    removeUnneededlines(ezdxf.readfile(path_to_dwg),triangleErrorRange,printDeets).saveas(os.path.join(output_path,output_name+".dwg"))
 
 def get_dwg_info(path_to_dwg:str,output_path:str,outputfoldername:str = "dwg_file_infos",printDeets:bool = True):
     output_path = os.path.join(output_path,outputfoldername)
