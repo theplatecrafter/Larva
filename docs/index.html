@@ -14,9 +14,7 @@
     <div id="result"></div>
     <script type="text/python">
         from browser import document
-
-        def ping():
-            return "pong"
+        from Larva.direct_data_handler import *
 
         def handle_ping(event):
             result = ping()
