@@ -13,6 +13,10 @@ video_output_dir = "output/video"
 slices_output_dir = "output/slices"
 
 ## local functions
+def ping():
+    return "pong"
+
+
 def clear_output_paths():
     force_remove_all(body_output_dir)
     force_remove_all(dwg_output_dir)
