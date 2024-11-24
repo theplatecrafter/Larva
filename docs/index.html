@@ -14,10 +14,10 @@
     <div id="result"></div>
     <script type="text/python">
         from browser import document
-        from Larva.direct_data_handler import *
+        import Larva.direct_data_handler as ddh
 
         def handle_ping(event):
-            result = ping()
+            result = ddh.ping()
             document["result"].text = f"Result: {result}"
 
         document["pingBtn"].bind("click", handle_ping)
