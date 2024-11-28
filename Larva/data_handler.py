@@ -107,11 +107,11 @@ def directional_slice_stl(input_trimesh:trimesh.Trimesh,processingDimentionSize:
 
     return singleX + singleY + singleZ ## TODO
 
-def gided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNormal:list=None,printDeets:bool = False,margin:float = 6) -> list:
+def guided_layer_slice_stl(input_trimesh:trimesh.Trimesh,sliceWidth:float,slicePlaneNormal:list=None,printDeets:bool = False,margin:float = 6) -> list:
     if not slicePlaneNormal:
-        x = gided_layer_slice_stl(input_trimesh,sliceWidth,[1,0,0],printDeets)
-        y = gided_layer_slice_stl(input_trimesh,sliceWidth,[0,1,0],printDeets)
-        z = gided_layer_slice_stl(input_trimesh,sliceWidth,[0,0,1],printDeets)
+        x = guided_layer_slice_stl(input_trimesh,sliceWidth,[1,0,0],printDeets)
+        y = guided_layer_slice_stl(input_trimesh,sliceWidth,[0,1,0],printDeets)
+        z = guided_layer_slice_stl(input_trimesh,sliceWidth,[0,0,1],printDeets)
         
         xD = [get_dwg_minmaxP(i,True) for i in x]
         yD = [get_dwg_minmaxP(i,True) for i in y]

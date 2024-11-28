@@ -307,7 +307,7 @@ def combine_lines(line1: Line, line2: Line, tolerance: float = 1e-6) -> Union[Li
     return False
 
 
-## gided layer slice
+## guided layer slice
 def get_dwg_minmaxP(doc: ezdxf.document.Drawing, outputDimensions: bool = False) -> tuple:
     msp = doc.modelspace()
     lines = [i for i in msp if i.dxftype() == "LINE"]

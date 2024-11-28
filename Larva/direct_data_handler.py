@@ -180,7 +180,7 @@ def DEVview_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png
         return plt
     return plt
 
-def view_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", color_triangles: bool = True, keep_aspect_ratio: bool = True, rotation_angles: tuple = None, resolution: tuple = (1600, 1200), margin: float = 0.1):
+def view_stl_sub(stl_path: str, output_dir: str, output_name: str = "stl_view.png", color_triangles: bool = True, keep_aspect_ratio: bool = True, rotation_angles: tuple = None, resolution: tuple = (1600, 1200), margin: float = 0.1):
     # Load the STL file
     your_mesh = m.Mesh.from_file(stl_path)
     
@@ -328,7 +328,7 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
     print(f"DWG view saved as {image_path}")
 
 
-def Bs_view_stl(stl_path:str):
+def view_stl(stl_path:str):
     
     data = m.Mesh.from_file(stl_path)
     # reshape Nx3x3 to N*3x3 to convert polygons to points
