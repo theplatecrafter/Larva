@@ -111,7 +111,7 @@ def DEVdirectional_slice(stl_path:str,output_folder:str,material_thickness:float
     grid_pack_dwg(directional_slice_stl(tri,material_thickness,noturn,printDeets)).saveas(os.path.join(output_folder,"least_part.dwg"))
 
 ## view
-def DEVview_stl(stl_path: str, output_dir: str, output_name: str = "stl_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave:bool = False):
+def view_stl_old(stl_path: str, output_dir: str, output_name: str = "stl_view.png", start_end_points: tuple = None, return_info: bool = False, onlySave:bool = False):
     target_stl = m.Mesh.from_file(stl_path)
 
     if start_end_points:
