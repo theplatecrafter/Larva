@@ -327,7 +327,6 @@ def view_dwg(dwg_path: str, output_dir: str, output_name: str = "dwg_view.png", 
     
     print(f"DWG view saved as {image_path}")
 
-
 def view_stl(stl_path:str):
     
     data = m.Mesh.from_file(stl_path)
@@ -367,11 +366,9 @@ def view_stl(stl_path:str):
 
     fig.show()
 
-
 def view_drawing(doc: ezdxf.document.Drawing, save_path: str = None):
     doc.saveas(os.path.join(dwg_output_dir,"temp.dwg"))
     view_dwg(os.path.join(dwg_output_dir,"temp.dwg"),image_output_dir,"temp.png")
-
 
 def save_drawing(drawing: ezdxf.document.Drawing, output_directory:str,filename: str = "out", dxf_version: str = 'R12'):
     """
